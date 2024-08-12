@@ -40,6 +40,7 @@ Metadata:
       CodeBuildTimeout:
         default: CodeBuild timeout
 
+
 Parameters:
   ProwlerOptions:
     Description: 'Specify the parameters for Prowler. The --role and ARN will automatically be added to the end of the parameters you specify.'
@@ -73,7 +74,7 @@ Parameters:
     Type: String
     Default: ''
   Reporting:
-    Description: 'Set this to true if you want to summarize the Prowler reports using Amazon Athena. This is helpful when scanning multiple accounts.'
+    Description: 'Set this to true if you want to summarize the Prowler reports using Amazon Athena. To use the Prowler native dashboard set this to false'
     Type: String
     AllowedValues:
       - 'true'
@@ -460,6 +461,9 @@ Resources:
           - Name: PARALLEL_ACCOUNTS
             Value: !FindInMap [CodeBuildPerformanceOptionMap, !Ref ConcurrentAccountScans, 'ParallelAccounts']
             Type: PLAINTEXT
+          - Name: PROWLER_DASHBOARD
+            Value: !Ref Reporting #This value will be true is Amazon Athena reporting is used. 
+            Type: PLAINTEXT  
       Description: Run Prowler assessment
       ServiceRole: !GetAtt ProwlerCodeBuildRole.Arn
       TimeoutInMinutes: !Ref CodeBuildTimeout
@@ -475,7 +479,7 @@ Resources:
                 python: 3.11
               commands:
                 - echo "Installing Prowler and dependencies..."
-                - pip3 install prowler
+                - pip3 install prowler --quiet
                 - prowler -v
             build:
               commands:
@@ -514,14 +518,29 @@ Resources:
                   wait   
             post_build:
               commands:
-                - echo "Uploading reports to S3..."
-                - aws s3 cp --exclude "*" --include "*.csv" --exclude "compliance**" output/ s3://$BUCKET_REPORT/csv/ --recursive
-                - aws s3 cp --exclude "*" --include "*.csv" output/compliance/ s3://$BUCKET_REPORT/compliance/ --recursive
-                - aws s3 cp --exclude "*" --include "*.ocsf.json" output/ s3://$BUCKET_REPORT/ocsf-json/ --recursive
-                - aws s3 cp --exclude "*" --include "*.json" --exclude "*.ocsf.json" --exclude "*.asff.json" output/ s3://$BUCKET_REPORT/json/ --recursive
-                - aws s3 cp --exclude "*" --include "*.html" output/ s3://$BUCKET_REPORT/html/ --recursive
-                - aws s3 cp --exclude "*" --include "*.asff.json" output/ s3://$BUCKET_REPORT/asff-json/ --recursive
-                - echo "Done!"
+                - |
+
+                  echo "Uploading reports to S3..."
+
+                  # The value of "PROWLER_DASHBOARD" will be true only when Reporting is false and vice versa
+                  if [[ $PROWLER_DASHBOARD != 'true' ]]; then
+                    echo "Copying Prowler Scan output in the format required by Prowler Dashboard"
+                    aws s3 cp output/ s3://$BUCKET_REPORT/output/ --recursive --only-show-errors
+                  
+                  elif [[ $PROWLER_DASHBOARD = 'true' ]]; then
+
+                    echo "Copying Prowler Scan output in the format required for Amazon Athena reporting"
+                    aws s3 cp --exclude "*" --include "*.csv" --exclude "compliance**" output/ s3://$BUCKET_REPORT/csv/ --recursive --only-show-errors
+                    aws s3 cp --exclude "*" --include "*.csv" output/compliance/ s3://$BUCKET_REPORT/compliance/ --recursive --only-show-errors
+                    aws s3 cp --exclude "*" --include "*.ocsf.json" output/ s3://$BUCKET_REPORT/ocsf-json/ --recursive --only-show-errors
+                    aws s3 cp --exclude "*" --include "*.json" --exclude "*.ocsf.json" --exclude "*.asff.json" output/ s3://$BUCKET_REPORT/json/ --recursive --only-show-errors
+                    aws s3 cp --exclude "*" --include "*.html" output/ s3://$BUCKET_REPORT/html/ --recursive --only-show-errors
+                    aws s3 cp --exclude "*" --include "*.asff.json" output/ s3://$BUCKET_REPORT/asff-json/ --recursive  --only-show-errors 
+                    echo "Done!"
+
+                  fi
+
+                  wait
 
   ProwlerLogGroup:
     Metadata:
