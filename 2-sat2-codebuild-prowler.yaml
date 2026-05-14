@@ -503,8 +503,10 @@ Resources:
               runtime-versions:
                 python: 3.11
               commands:
-                - echo "Installing Prowler and dependencies..."
-                - pip3 install prowler==5.11 --quiet
+                - echo "Installing uv and Prowler..."
+                - curl -LsSf https://astral.sh/uv/install.sh | sh
+                - source $HOME/.local/bin/env
+                - uv pip install --system prowler==5.26 --quiet
                 - prowler -v
             build:
               commands:
@@ -1241,11 +1243,14 @@ Resources:
               runtime-versions:
                 python: 3.11
               commands:
+                - echo "Installing uv..."
+                - curl -LsSf https://astral.sh/uv/install.sh | sh
+                - source $HOME/.local/bin/env
                 - echo "Downloading repo..."
                 - git clone https://github.com/awslabs/aws-security-assessment-solution.git
                 - cd aws-security-assessment-solution/reporting
                 - echo "Installing dependencies..."
-                - pip3 install -r requirements.txt
+                - uv pip install --system -r requirements.txt --quiet
             build:
               commands:
                 - echo "Using Athena summary csv $ATHENA_SUMMARY_CSV"
