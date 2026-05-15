@@ -68,6 +68,8 @@ Parameters:
     Description: 'Specify a space delimited list of accounts to scan. Leaving this blank will scan all accounts in your organization.'
     Type: String
     Default: ''
+    AllowedPattern: '^$|^\d{12}(\s+\d{12})*$'
+    ConstraintDescription: 'Must be empty or a space-separated list of 12-digit AWS account IDs (e.g., "123456789012 234567890123")'
   EmailAddress:
     Description: 'Specify an address if you want to receive an email when the scan completes.'
     Type: String
