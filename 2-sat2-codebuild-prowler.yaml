@@ -19,6 +19,13 @@ Metadata:
           - MultiAccountListOverride
           - ProwlerOptions
           - ProwlerRole
+          - SourceRepoUrl
+          - SourceRepoBranch
+      - Label:
+          default: Resource tags
+        Parameters:
+          - ProjectTag
+          - EnvironmentTag
 
     ParameterLabels:
       ProwlerOptions:
@@ -39,6 +46,14 @@ Metadata:
         default: Concurrent account scans
       CodeBuildTimeout:
         default: CodeBuild timeout
+      SourceRepoUrl:
+        default: Source repository URL
+      SourceRepoBranch:
+        default: Source repository branch
+      ProjectTag:
+        default: Project tag
+      EnvironmentTag:
+        default: Environment tag
 
 Parameters:
   ProwlerOptions:
@@ -91,11 +106,34 @@ Parameters:
       - 'FortyEight'
     Default: 'Three'
   CodeBuildTimeout:
-    Description: 'Set the timeout for the CodeBuild job. The default is 300 minutes (5 hours).'
+    Description: 'Set the timeout for the CodeBuild job. The default is 300 minutes (5 hours). Maximum is 2160 minutes (36 hours).'
     Type: Number
     MinValue: 5
     MaxValue: 2160
     Default: 300
+  SourceRepoUrl:
+    Description: 'Git repository URL for the reporting code. Must be from trusted GitHub organizations (awslabs, aws, agasthik).'
+    Type: String
+    Default: 'https://github.com/awslabs/aws-security-assessment-solution.git'
+    AllowedPattern: '^https://github\.com/(awslabs|aws|agasthik)/[a-zA-Z0-9_.-]+\.git$'
+    ConstraintDescription: 'Must be a valid GitHub HTTPS URL from trusted organizations (awslabs, aws, or agasthik). Format: https://github.com/{org}/{repo}.git'
+  SourceRepoBranch:
+    Description: 'Git branch to use for the reporting code.'
+    Type: String
+    Default: 'main'
+  ProjectTag:
+    Description: 'Project name for resource tagging and cost allocation.'
+    Type: String
+    Default: 'SecurityAssessment'
+  EnvironmentTag:
+    Description: 'Environment name for resource tagging (e.g., Production, Development, Staging).'
+    Type: String
+    Default: 'Production'
+    AllowedValues:
+      - 'Production'
+      - 'Development'
+      - 'Staging'
+      - 'Test'
 
 Conditions:
   CreateProwlerRole: !Equals
@@ -240,6 +278,11 @@ Resources:
                 Resource:
                   - !Sub arn:${AWS::Partition}:apigateway:*::/restapis/*
                   - !Sub arn:${AWS::Partition}:apigateway:*::/apis/*
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Environment
+          Value: !Ref EnvironmentTag
 
   ProwlerFindingsBucket:
     Metadata:
@@ -263,6 +306,11 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Environment
+          Value: !Ref EnvironmentTag
   ProwlerFindingsBucketPolicy:
     Type: 'AWS::S3::BucketPolicy'
     Properties:
@@ -312,6 +360,11 @@ Resources:
                 Action:
                   - 'codebuild:StartBuild'
                 Resource: !GetAtt ProwlerCodeBuild.Arn
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Environment
+          Value: !Ref EnvironmentTag
 
   CodeBuildStartBuildLogsGroup:
     Metadata:
@@ -324,7 +377,12 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub '/aws/lambda/${CodeBuildStartBuildLambda}'
-      RetentionInDays: 7
+      RetentionInDays: 30
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Environment
+          Value: !Ref EnvironmentTag
 
   CodeBuildStartBuildLambda:
     Metadata:
@@ -341,10 +399,9 @@ Resources:
       Handler: index.lambda_handler
       Role: !Sub ${CodeBuildStartBuildLambdaRole.Arn}
       Timeout: 120
-      Runtime: python3.10
+      Runtime: python3.12
       Code:
         ZipFile: |
-          import os
           import boto3
           from botocore.exceptions import ClientError
           import cfnresponse
@@ -372,6 +429,11 @@ Resources:
               startBuild(event, context)
             else:
               no_op(event,context)
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Environment
+          Value: !Ref EnvironmentTag
 
   #This is the role that has privileges to assume Prowler member roles
   ProwlerCodeBuildRole:
@@ -423,7 +485,7 @@ Resources:
               - Action:
                   - sts:AssumeRole
                 Effect: Allow
-                Resource: !Sub 'arn:${AWS::Partition}:iam::*:role/service-role/ProwlerMemberRole'
+                Resource: !Sub 'arn:${AWS::Partition}:iam::*:role/service-role/${ProwlerRole}'
         - PolicyName: ListOrganizationAccounts
           PolicyDocument:
             Version: '2012-10-17'
@@ -434,6 +496,11 @@ Resources:
                   - organizations:ListTagsForResource
                 Effect: Allow
                 Resource: '*'
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Environment
+          Value: !Ref EnvironmentTag
 
   ProwlerCodeBuild:
     Metadata:
@@ -503,12 +570,20 @@ Resources:
           phases:
             install:
               runtime-versions:
-                python: 3.11
+                python: 3.12
               commands:
                 - echo "Installing uv and Prowler..."
-                - curl -LsSf https://astral.sh/uv/install.sh | sh
+                - |
+                  if ! curl -LsSf https://astral.sh/uv/install.sh | sh; then
+                    echo "ERROR: Failed to install uv"
+                    exit 1
+                  fi
                 - source $HOME/.local/bin/env
-                - uv pip install --system prowler==5.26.1 --quiet
+                - |
+                  if ! uv pip install --system prowler==5.26.1 --quiet; then
+                    echo "ERROR: Failed to install Prowler"
+                    exit 1
+                  fi
                 - prowler -v
             build:
               commands:
@@ -536,7 +611,8 @@ Resources:
 
                       echo "Using accounts $account_list."
 
-                      failed_accounts=()
+                      # Use temp file to track failed accounts from subshells
+                      FAILED_ACCOUNTS_FILE=$(mktemp)
                       for accountId in $account_list; do
                           test "$(jobs | wc -l)" -ge $PARALLEL_ACCOUNTS && wait || true
                           {
@@ -545,11 +621,21 @@ Resources:
                               PROWLER_EXIT_CODE=$?
                               if [ $PROWLER_EXIT_CODE -ne 0 ]; then
                                   echo "ERROR: Prowler scan failed for account $accountId"
-                                  failed_accounts+=($accountId)
-                                  exit $PROWLER_EXIT_CODE
+                                  echo "$accountId" >> "$FAILED_ACCOUNTS_FILE"
                               fi
                           } &
                       done
+
+                      wait
+
+                      if [[ -s "$FAILED_ACCOUNTS_FILE" ]]; then
+                          echo "WARNING: Prowler scans failed for the following accounts:"
+                          cat "$FAILED_ACCOUNTS_FILE"
+                          echo "Check logs above for specific error details"
+                          rm -f "$FAILED_ACCOUNTS_FILE"
+                          exit 1
+                      fi
+                      rm -f "$FAILED_ACCOUNTS_FILE"
 
                   elif [[ $MULTI_ACCOUNT_SCAN != 'true' ]]; then
 
@@ -562,13 +648,6 @@ Resources:
                           exit $PROWLER_EXIT_CODE
                       fi
 
-                  fi
-
-                  wait
-
-                  if [[ ${#failed_accounts[@]} -gt 0 ]]; then
-                      echo "WARNING: Prowler scans failed for the following accounts: ${failed_accounts[*]}"
-                      echo "Check logs above for specific error details"
                   fi
             post_build:
               commands:
@@ -626,6 +705,11 @@ Resources:
 
                       echo "All reports uploaded successfully!"
                   fi
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Environment
+          Value: !Ref EnvironmentTag
 
   ProwlerLogGroup:
     Metadata:
@@ -638,7 +722,12 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub '/aws/codebuild/${ProwlerCodeBuild}'
-      RetentionInDays: 7
+      RetentionInDays: 30
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Environment
+          Value: !Ref EnvironmentTag
 
   ProwlerScanNotificationTopic:
     Metadata:
@@ -652,6 +741,11 @@ Resources:
       Subscription:
         - Endpoint: !Ref EmailAddress
           Protocol: email
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Environment
+          Value: !Ref EnvironmentTag
 
   ProwlerSnsNotificationsPolicy:
     Condition: CreateEmailNotification
@@ -700,339 +794,13 @@ Resources:
               "The Prowler scan has <build-status>."
 
               "You can view your results in the <bucket> bucket."
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Environment
+          Value: !Ref EnvironmentTag
 
-  GlueDatabaseSATv2Findings:
-    Condition: EnableReporting
-    Type: AWS::Glue::Database
-    Properties:
-      CatalogId: !Ref AWS::AccountId
-      DatabaseInput:
-        Name: !Ref ProwlerFindingsBucket
-        Description: !Sub 'SATv2 assessment results in the ${ProwlerFindingsBucket}'
-
-  GlueTableProwlerResults:
-    Condition: EnableReporting
-    Type: AWS::Glue::Table
-    Properties:
-      CatalogId: !Ref AWS::AccountId
-      DatabaseName: !Ref GlueDatabaseSATv2Findings
-      TableInput:
-        Name: 'prowler'
-        Description: 'Results of the Prowler scan from SATv2'
-        TableType: EXTERNAL_TABLE
-        Parameters: { 'skip.header.line.count': '1', 'classification': 'csv' }
-        StorageDescriptor:
-          Columns:
-            - Name: auth_method
-              Type: string
-            - Name: timestamp
-              Type: string
-            - Name: account_uid
-              Type: string
-            - Name: account_name
-              Type: string
-            - Name: account_email
-              Type: string
-            - Name: account_organization_uid
-              Type: string
-            - Name: account_organization_name
-              Type: string
-            - Name: account_tags
-              Type: string
-            - Name: finding_uid
-              Type: string
-            - Name: provider
-              Type: string
-            - Name: check_id
-              Type: string
-            - Name: check_title
-              Type: string
-            - Name: check_type
-              Type: string
-            - Name: status
-              Type: string
-            - Name: status_extended
-              Type: string
-            - Name: muted
-              Type: boolean
-            - Name: service_name
-              Type: string
-            - Name: subservice_name
-              Type: string
-            - Name: severity
-              Type: string
-            - Name: resource_type
-              Type: string
-            - Name: resource_uid
-              Type: string
-            - Name: resource_name
-              Type: string
-            - Name: resource_details
-              Type: string
-            - Name: resource_tags
-              Type: string
-            - Name: partition
-              Type: string
-            - Name: region
-              Type: string
-            - Name: description
-              Type: string
-            - Name: risk
-              Type: string
-            - Name: related_url
-              Type: string
-            - Name: remediation_recommendation_text
-              Type: string
-            - Name: remediation_recommendation_url
-              Type: string
-            - Name: remediation_code_nativeiac
-              Type: string
-            - Name: remediation_code_terraform
-              Type: string
-            - Name: remediation_code_cli
-              Type: string
-            - Name: remediation_code_other
-              Type: string
-            - Name: compliance
-              Type: string
-            - Name: categories
-              Type: string
-            - Name: depends_on
-              Type: string
-            - Name: related_to
-              Type: string
-            - Name: notes
-              Type: string
-            - Name: prowler_version
-              Type: string
-          Location: !Sub s3://${ProwlerFindingsBucket}/csv
-          InputFormat: org.apache.hadoop.mapred.TextInputFormat
-          OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-          Compressed: False
-          StoredAsSubDirectories: False
-          SerdeInfo:
-            SerializationLibrary: org.apache.hadoop.hive.serde2.OpenCSVSerde
-            Parameters:
-              { 'escapeChar': "\\", 'quoteChar': '"', 'separatorChar': ';' }
-        Retention: 0
-
-  LakeFormationPermissionsLambda:
-    Condition: EnableReporting
-    Type: AWS::LakeFormation::Permissions
-    Properties:
-      DataLakePrincipal:
-        DataLakePrincipalIdentifier: !Sub ${AthenaStartQueryLambdaRole.Arn}
-      Permissions:
-        - SELECT
-      Resource:
-        TableResource:
-          DatabaseName: !Ref GlueDatabaseSATv2Findings
-          Name: !Ref GlueTableProwlerResults
-
-  SATv2Reporting:
-    Condition: EnableReporting
-    Type: AWS::Athena::WorkGroup
-    Properties:
-      Name: !Ref GlueDatabaseSATv2Findings
-      RecursiveDeleteOption: True
-      State: ENABLED
-      WorkGroupConfiguration:
-        PublishCloudWatchMetricsEnabled: false
-        RequesterPaysEnabled: false
-        ResultConfiguration:
-          OutputLocation: !Sub s3://${ProwlerFindingsBucket}/athena_results
-        EnforceWorkGroupConfiguration: false
-
-  qProwlerOrgSummary:
-    Condition: EnableReporting
-    Type: AWS::Athena::NamedQuery
-    Properties:
-      Database: !Ref GlueDatabaseSATv2Findings
-      Description: 'Count the number of recommendations across all assessed accounts'
-      Name: 'Prowler organization summary'
-      QueryString: !Sub |
-        -- Count the number of recommendations across all assessed accounts.
-          SELECT
-              check_id,
-              count(*) as count
-          FROM
-              "${GlueDatabaseSATv2Findings}"."prowler"
-          WHERE
-              status = 'FAIL'
-          GROUP BY
-              check_id
-          ORDER BY
-              count desc
-      WorkGroup: !Ref SATv2Reporting
-
-  AthenaStartQueryLambdaRole:
-    Condition: EnableReporting
-    Type: 'AWS::IAM::Role'
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action:
-              - 'sts:AssumeRole'
-            Condition:
-              StringEquals:
-                aws:SourceAccount: !Sub ${AWS::AccountId}
-      Path: /
-      ManagedPolicyArns:
-        - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-      Policies:
-        - PolicyName: AccessToAthena
-          PolicyDocument:
-            Statement:
-              - Effect: Allow
-                Action:
-                  - 'athena:StartQueryExecution'
-                Resource: !Sub arn:${AWS::Partition}:athena:${AWS::Region}:${AWS::AccountId}:workgroup/${SATv2Reporting}
-              - Effect: Allow
-                Action:
-                  - s3:GetBucketLocation
-                  - s3:GetObject
-                  - s3:ListBucket
-                  - s3:ListBucketMultipartUploads
-                  - s3:AbortMultipartUpload
-                  - s3:PutObject
-                  - s3:ListMultipartUploadParts
-                Resource:
-                  - !GetAtt ProwlerFindingsBucket.Arn
-                  - !Sub ${ProwlerFindingsBucket.Arn}/*
-              - Effect: Allow
-                Action:
-                  - 'glue:GetTable'
-                  - 'glue:GetDatabase'
-                Resource:
-                  - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:catalog
-                  - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:database/${GlueDatabaseSATv2Findings}
-                  - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:table/${GlueDatabaseSATv2Findings}/${GlueTableProwlerResults}
-
-  AthenaStartQueryLogGroup:
-    Condition: EnableReporting
-    Metadata:
-      cfn_nag:
-        rules_to_suppress:
-          - id: W84
-            reason: CloudWatch Logs protects data at rest using encryption. All log groups are encrypted. By default, the CloudWatch Logs service manages the server-side encryption keys.
-    UpdateReplacePolicy: Delete
-    DeletionPolicy: Delete
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub '/aws/lambda/${AthenaStartQueryLambda}'
-      RetentionInDays: 7
-
-  AthenaStartQueryLambda:
-    Condition: EnableReporting
-    Metadata:
-      cfn_nag:
-        rules_to_suppress:
-          - id: W58
-            reason: The AthenaStartQueryLambdaRole gives Lambda access to write CloudWatch logs.
-          - id: W89
-            reason: Lambda is not deployed inside of a VPC. The Lambda function is used to start the CodeBuild job as a custom CloudFormation resource.
-          - id: W92
-            reason: Reserved concurrent executions is not set.
-    Type: AWS::Lambda::Function
-    Properties:
-      Handler: index.lambda_handler
-      Role: !Sub ${AthenaStartQueryLambdaRole.Arn}
-      Timeout: 120
-      Environment:
-        Variables:
-          ATHENA_WORKGROUP: !Ref SATv2Reporting
-          BUCKET_REPORT: !Ref ProwlerFindingsBucket
-      Runtime: python3.10
-      Code:
-        ZipFile: |
-          import os
-          import boto3
-          from botocore.exceptions import ClientError
-
-          S3_BUCKET = os.environ['BUCKET_REPORT']
-          WORKGROUP = os.environ['ATHENA_WORKGROUP']
-
-          def startQuery(event, context):
-              responseData = {}
-              athena = boto3.client('athena')
-              try:
-                print("Starting query...")
-                response = athena.start_query_execution(
-                    QueryString="""SELECT * FROM \"AwsDataCatalog\".\"{}\".\"prowler\"""".format(S3_BUCKET),
-                    WorkGroup=WORKGROUP,
-                    ResultConfiguration={'OutputLocation': f's3://{S3_BUCKET}/reports'}
-                    )
-                print(response)
-              except ClientError as e:
-                print("Failed to start query")
-                print(e)
-
-          def lambda_handler(event,context):
-              print(event)
-              startQuery(event, context)
-
-  AthenaStartQueryLambdaInvokePermission:
-    Condition: EnableReporting
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !GetAtt AthenaStartQueryLambda.Arn
-      Action: 'lambda:InvokeFunction'
-      Principal: 'events.amazonaws.com'
-      SourceArn: !GetAtt CodeBuildCompleteRunSummary.Arn
-
-  CodeBuildCompleteRunSummary:
-    Condition: EnableReporting
-    Type: AWS::Events::Rule
-    Properties:
-      EventBusName: default
-      EventPattern:
-        source:
-          - aws.codebuild
-        detail-type:
-          - CodeBuild Build State Change
-        detail:
-          build-status:
-            - SUCCEEDED
-          project-name:
-            - !Ref ProwlerCodeBuild
-      State: ENABLED
-      Targets:
-        - Id: AthenaStartQueryLambda
-          Arn: !GetAtt AthenaStartQueryLambda.Arn
-
-  AthenaSummaryQueryStateChangeRule:
-    Condition: CreateEmailNotification
-    Type: AWS::Events::Rule
-    Properties:
-      EventBusName: default
-      EventPattern:
-        source:
-          - aws.athena
-        detail-type:
-          - Athena Query State Change
-        detail:
-          currentState:
-            - SUCCEEDED
-            - FAILED
-          workgroupName:
-            - !Ref ProwlerFindingsBucket
-      State: ENABLED
-      Targets:
-        - Id: toSNS
-          Arn: !Ref ProwlerScanNotificationTopic
-          InputTransformer:
-            InputPathsMap:
-              status: $.detail.currentState
-            InputTemplate: !Sub >-
-              "The query to summarize reporting has <status>."
-
-              "You can view your results in the ${ProwlerFindingsBucket}/reports bucket."
-
-  # PPTX reporting
+  # Security Insights Dashboard Reporting
   ProwlerReportingLambdaRole:
     Condition: EnableReporting
     Type: 'AWS::IAM::Role'
@@ -1052,21 +820,6 @@ Resources:
       ManagedPolicyArns:
         - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
       Policies:
-        - PolicyName: AccessToS3
-          PolicyDocument:
-            Statement:
-              - Effect: Allow
-                Action:
-                  - s3:GetBucketLocation
-                  - s3:GetObject
-                  - s3:ListBucket
-                  - s3:ListBucketMultipartUploads
-                  - s3:AbortMultipartUpload
-                  - s3:PutObject
-                  - s3:ListMultipartUploadParts
-                Resource:
-                  - !GetAtt ProwlerFindingsBucket.Arn
-                  - !Sub ${ProwlerFindingsBucket.Arn}/*
         - PolicyName: AccessToCodeBuild
           PolicyDocument:
             Statement:
@@ -1074,6 +827,11 @@ Resources:
                 Action:
                   - 'codebuild:StartBuild'
                 Resource: !GetAtt ProwlerReportingCodeBuild.Arn
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Environment
+          Value: !Ref EnvironmentTag
 
   ProwlerReportingLogGroup:
     Condition: EnableReporting
@@ -1087,7 +845,12 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub '/aws/lambda/${ProwlerReportingLambda}'
-      RetentionInDays: 7
+      RetentionInDays: 30
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Environment
+          Value: !Ref EnvironmentTag
 
   ProwlerReportingLambda:
     Condition: EnableReporting
@@ -1105,36 +868,37 @@ Resources:
       Handler: index.lambda_handler
       Role: !Sub ${ProwlerReportingLambdaRole.Arn}
       Timeout: 120
-      Runtime: python3.10
+      Runtime: python3.12
+      Environment:
+        Variables:
+          CODEBUILD_PROJECT_NAME: !Ref ProwlerReportingCodeBuild
       Code:
         ZipFile: |
+          import os
           import boto3
           from botocore.exceptions import ClientError
 
           def startCodeBuildReport(event, context):
               print(event)
+              print("Starting reporting CodeBuild to generate security insights dashboard...")
 
-              bucket = event['detail']['bucket']['name']
-              key = event['detail']['object']['key']
-              full_path = f"s3://{bucket}/{key}"
-              print(f"Summary CSV from Athena: {full_path}")
-
+              project_name = os.environ['CODEBUILD_PROJECT_NAME']
               cb = boto3.client('codebuild')
               try:
-                print("Starting build...")
-                response = cb.start_build(projectName='ProwlerReportingCodeBuild', \
-                environmentVariablesOverride=[
-                  {
-                      'name': 'ATHENA_SUMMARY_CSV',
-                      'value': full_path
-                  }])
+                print(f"Starting build for project: {project_name}")
+                response = cb.start_build(projectName=project_name)
                 print(response)
               except ClientError as e:
-                print("Failed to start query")
+                print("Failed to start CodeBuild")
                 print(e)
 
           def lambda_handler(event,context):
               startCodeBuildReport(event, context)
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Environment
+          Value: !Ref EnvironmentTag
 
   ProwlerReportingLambdaInvokePermission:
     Condition: EnableReporting
@@ -1143,29 +907,32 @@ Resources:
       FunctionName: !GetAtt ProwlerReportingLambda.Arn
       Action: 'lambda:InvokeFunction'
       Principal: 'events.amazonaws.com'
-      SourceArn: !GetAtt ProwlerReportingS3Upload.Arn
+      SourceArn: !GetAtt ProwlerReportingTrigger.Arn
 
-  ProwlerReportingS3Upload:
+  ProwlerReportingTrigger:
     Condition: EnableReporting
     Type: AWS::Events::Rule
     Properties:
       EventBusName: default
       EventPattern:
         source:
-          - aws.s3
+          - aws.codebuild
         detail-type:
-          - Object Created
+          - CodeBuild Build State Change
         detail:
-          bucket:
-            name:
-              - !Ref ProwlerFindingsBucket
-          object:
-            key:
-              - wildcard: reports/*.csv
+          build-status:
+            - SUCCEEDED
+          project-name:
+            - !Ref ProwlerCodeBuild
       State: ENABLED
       Targets:
         - Id: toLambda
           Arn: !GetAtt ProwlerReportingLambda.Arn
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Environment
+          Value: !Ref EnvironmentTag
 
   ProwlerReportingCodeBuildRole:
     Condition: EnableReporting
@@ -1209,6 +976,11 @@ Resources:
                 Resource:
                   - !GetAtt ProwlerFindingsBucket.Arn
                   - !Sub ${ProwlerFindingsBucket.Arn}/*
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Environment
+          Value: !Ref EnvironmentTag
 
   ProwlerReportingCodeBuild:
     Condition: EnableReporting
@@ -1225,11 +997,14 @@ Resources:
         Image: 'aws/codebuild/amazonlinux2-x86_64-standard:5.0'
         Type: 'LINUX_CONTAINER'
         EnvironmentVariables:
-          - Name: ATHENA_SUMMARY_CSV
-            Value: ''
-            Type: PLAINTEXT
           - Name: BUCKET_REPORT
             Value: !Ref ProwlerFindingsBucket
+            Type: PLAINTEXT
+          - Name: SOURCE_REPO_URL
+            Value: !Ref SourceRepoUrl
+            Type: PLAINTEXT
+          - Name: SOURCE_REPO_BRANCH
+            Value: !Ref SourceRepoBranch
             Type: PLAINTEXT
       Description: Create Prowler report
       ServiceRole: !GetAtt ProwlerReportingCodeBuildRole.Arn
@@ -1243,28 +1018,101 @@ Resources:
           phases:
             install:
               runtime-versions:
-                python: 3.11
+                python: 3.12
               commands:
                 - echo "Installing uv..."
-                - curl -LsSf https://astral.sh/uv/install.sh | sh
+                - |
+                  if ! curl -LsSf https://astral.sh/uv/install.sh | sh; then
+                    echo "ERROR: Failed to install uv"
+                    exit 1
+                  fi
                 - source $HOME/.local/bin/env
-                - echo "Downloading repo..."
-                - git clone https://github.com/awslabs/aws-security-assessment-solution.git
-                - cd aws-security-assessment-solution/reporting
-                - echo "Installing dependencies..."
-                - uv pip install --system -r requirements.txt --quiet
+                - echo "Downloading repo from $SOURCE_REPO_URL (branch: $SOURCE_REPO_BRANCH)..."
+                - |
+                  if ! git clone --branch $SOURCE_REPO_BRANCH --single-branch $SOURCE_REPO_URL; then
+                    echo "ERROR: Failed to clone repository $SOURCE_REPO_URL (branch: $SOURCE_REPO_BRANCH)"
+                    exit 1
+                  fi
+                - |
+                  # Extract repo directory name from URL
+                  REPO_DIR=$(basename "$SOURCE_REPO_URL" .git)
+                  echo "REPO_DIR=$REPO_DIR" >> $CODEBUILD_SRC_DIR/env.sh
+                  REPORTING_DIR="$REPO_DIR/reporting"
+                  echo "REPORTING_DIR=$REPORTING_DIR" >> $CODEBUILD_SRC_DIR/env.sh
+                - source $CODEBUILD_SRC_DIR/env.sh
+                - echo "Installing dependencies from $REPORTING_DIR..."
+                - |
+                  if ! uv pip install --system -r $REPORTING_DIR/requirements.txt --quiet; then
+                    echo "ERROR: Failed to install Python dependencies"
+                    exit 1
+                  fi
             build:
               commands:
-                - echo "Using Athena summary csv $ATHENA_SUMMARY_CSV"
-                - aws s3 cp $ATHENA_SUMMARY_CSV .
-                - python report.py
+                - source $CODEBUILD_SRC_DIR/env.sh
+                - echo "Generating security insights dashboard from s3://$BUCKET_REPORT/csv/"
+                - |
+                  cd $REPORTING_DIR
+                  if ! python generate_cspm_scan_insights.py --output-dir "s3://$BUCKET_REPORT/csv" --dashboard-file cspm_scan_insights.html; then
+                    echo "ERROR: Failed to generate security insights dashboard"
+                    exit 1
+                  fi
             post_build:
               commands:
+                - source $CODEBUILD_SRC_DIR/env.sh
+                - |
+                  if [ "$CODEBUILD_BUILD_SUCCEEDING" = "0" ]; then
+                    echo "ERROR: Build phase failed. Skipping dashboard upload."
+                    exit 1
+                  fi
                 - echo "Uploading html dashboard to S3..."
-                - aws s3 cp satv2-dashboard.html s3://$BUCKET_REPORT/reports/
-                - echo "Done!"
+                - |
+                  if ! aws s3 cp $REPORTING_DIR/cspm_scan_insights.html s3://$BUCKET_REPORT/reports/; then
+                    echo "ERROR: Failed to upload dashboard to S3"
+                    exit 1
+                  fi
+                - echo "Dashboard successfully uploaded to s3://$BUCKET_REPORT/reports/cspm_scan_insights.html"
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Environment
+          Value: !Ref EnvironmentTag
 
 Outputs:
   AccountID:
-    Description: ID that Prowler is running from
+    Description: Account ID where Prowler is running
+    Value: !Ref AWS::AccountId
+
+  ProwlerCodeBuildRoleArn:
+    Description: ARN of the Prowler CodeBuild execution role
     Value: !GetAtt ProwlerCodeBuildRole.Arn
+
+  ReportBucketName:
+    Description: S3 bucket for Prowler scan results and reports
+    Value: !Ref ProwlerFindingsBucket
+
+  ReportBucketUrl:
+    Description: S3 console URL for the report bucket
+    Value: !Sub "https://s3.console.aws.amazon.com/s3/buckets/${ProwlerFindingsBucket}"
+
+  DashboardS3Path:
+    Condition: EnableReporting
+    Description: S3 path to the security insights dashboard
+    Value: !Sub "s3://${ProwlerFindingsBucket}/reports/cspm_scan_insights.html"
+
+  ProwlerCodeBuildProject:
+    Description: Name of the Prowler scan CodeBuild project
+    Value: !Ref ProwlerCodeBuild
+
+  ReportingCodeBuildProject:
+    Condition: EnableReporting
+    Description: Name of the reporting CodeBuild project
+    Value: !Ref ProwlerReportingCodeBuild
+
+  ProwlerCodeBuildConsoleUrl:
+    Description: CodeBuild console URL for Prowler scans
+    Value: !Sub "https://${AWS::Region}.console.aws.amazon.com/codesuite/codebuild/projects/${ProwlerCodeBuild}"
+
+  ReportingCodeBuildConsoleUrl:
+    Condition: EnableReporting
+    Description: CodeBuild console URL for reporting
+    Value: !Sub "https://${AWS::Region}.console.aws.amazon.com/codesuite/codebuild/projects/${ProwlerReportingCodeBuild}"
