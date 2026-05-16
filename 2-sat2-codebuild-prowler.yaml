@@ -57,94 +57,90 @@ Metadata:
 
 Parameters:
   ProwlerOptions:
-    Description: 'Specify the parameters for Prowler. The --role and ARN will automatically be added to the end of the parameters you specify.'
+    Description: "Specify the parameters for Prowler. The --role and ARN will automatically be added to the end of the parameters you specify."
     Type: String
     Default: aws --ignore-exit-code-3
   ProwlerScanType:
-    Description: 'Specify which type of scan to perform. A basic scan runs 13 checks. An Intermediate scan runs all 109+ critical and high checks. A Full scan runs all 383+ checks.'
+    Description: "Specify which type of scan to perform. A basic scan runs 13 checks. An Intermediate scan runs all 236 critical and high checks. A Full scan runs all 597 checks."
     Type: String
     AllowedValues:
-      - 'Basic'
-      - 'Intermediate'
-      - 'Full'
-    Default: 'Intermediate'
+      - "Basic"
+      - "Intermediate"
+      - "Full"
+    Default: "Intermediate"
   ProwlerRole:
-    Description: 'The role that Prowler should assume to perform the scan.'
+    Description: "The role that Prowler should assume to perform the scan."
     Type: String
     Default: ProwlerMemberRole
   MultiAccountScan:
-    Description: 'Set this to true if you want to scan all accounts in your organization. You must have deployed the prerequisite template to provision a role, or specify a different ProwlerRole with the appropriate permissions.'
+    Description: "Set this to true if you want to scan all accounts in your organization. You must have deployed the prerequisite template to provision a role, or specify a different ProwlerRole with the appropriate permissions."
     Type: String
     AllowedValues:
-      - 'true'
-      - 'false'
-    Default: 'false'
+      - "true"
+      - "false"
+    Default: "false"
   MultiAccountListOverride:
-    Description: 'Specify a space delimited list of accounts to scan. Leaving this blank will scan all accounts in your organization.'
+    Description: "Specify a space delimited list of accounts to scan. Leaving this blank will scan all accounts in your organization."
     Type: String
-    Default: ''
+    Default: ""
     AllowedPattern: '^$|^\d{12}(\s+\d{12})*$'
     ConstraintDescription: 'Must be empty or a space-separated list of 12-digit AWS account IDs (e.g., "123456789012 234567890123")'
   EmailAddress:
-    Description: 'Specify an address if you want to receive an email when the scan completes.'
+    Description: "Specify an address if you want to receive an email when the scan completes."
     Type: String
-    Default: ''
+    Default: ""
   Reporting:
-    Description: 'Set this to true if you want to summarize the reports and use the dashboard. This is helpful when scanning multiple accounts.'
+    Description: "Set this to true if you want to summarize the reports and use the dashboard. This is helpful when scanning multiple accounts."
     Type: String
     AllowedValues:
-      - 'true'
-      - 'false'
-    Default: 'true'
+      - "true"
+      - "false"
+    Default: "true"
   ConcurrentAccountScans:
-    Description: 'For multi-account scans, specify the number of accounts to scan concurrently. This is useful for large organizations with many accounts. Selecting more than three may incur additional costs.'
+    Description: "For multi-account scans, specify the number of accounts to scan concurrently. This is useful for large organizations with many accounts. Selecting more than three may incur additional costs."
     Type: String
     AllowedValues:
-      - 'Three'
-      - 'Six'
-      - 'Twelve'
-      - 'FortyEight'
-    Default: 'Three'
+      - "Three"
+      - "Six"
+      - "Twelve"
+      - "FortyEight"
+    Default: "Three"
   CodeBuildTimeout:
-    Description: 'Set the timeout for the CodeBuild job. The default is 300 minutes (5 hours). Maximum is 2160 minutes (36 hours).'
+    Description: "Set the timeout for the CodeBuild job. The default is 300 minutes (5 hours). Maximum is 2160 minutes (36 hours)."
     Type: Number
     MinValue: 5
     MaxValue: 2160
     Default: 300
   SourceRepoUrl:
-    Description: 'Git repository URL for the reporting code. Must be from trusted GitHub organizations (awslabs, aws, agasthik).'
+    Description: "Git repository URL for the reporting code. Must be from trusted GitHub organizations (agasthik, aws, agasthik)."
     Type: String
-    Default: 'https://github.com/awslabs/aws-security-assessment-solution.git'
-    AllowedPattern: '^https://github\.com/(awslabs|aws|agasthik)/[a-zA-Z0-9_.-]+\.git$'
-    ConstraintDescription: 'Must be a valid GitHub HTTPS URL from trusted organizations (awslabs, aws, or agasthik). Format: https://github.com/{org}/{repo}.git'
+    Default: "https://github.com/agasthik/aws-security-assessment-solution.git"
+    AllowedPattern: '^https://github\.com/(agasthik|aws|agasthik)/[a-zA-Z0-9_.-]+(\.git)?$'
+    ConstraintDescription: "Must be a valid GitHub HTTPS URL from trusted organizations (agasthik, aws, or agasthik). Format: https://github.com/{org}/{repo} or https://github.com/{org}/{repo}.git"
   SourceRepoBranch:
-    Description: 'Git branch to use for the reporting code.'
+    Description: "Git branch to use for the reporting code."
     Type: String
-    Default: 'main'
+    Default: "main"
   ProjectTag:
-    Description: 'Project name for resource tagging and cost allocation.'
+    Description: "Project name for resource tagging and cost allocation."
     Type: String
-    Default: 'SecurityAssessment'
+    Default: "SecurityAssessment"
   EnvironmentTag:
-    Description: 'Environment name for resource tagging (e.g., Production, Development, Staging).'
+    Description: "Environment name for resource tagging (e.g., Production, Development, Staging)."
     Type: String
-    Default: 'Production'
+    Default: "Production"
     AllowedValues:
-      - 'Production'
-      - 'Development'
-      - 'Staging'
-      - 'Test'
+      - "Production"
+      - "Development"
+      - "Staging"
+      - "Test"
 
 Conditions:
   CreateProwlerRole: !Equals
     - !Ref MultiAccountScan
     - false
 
-  CreateEmailNotification: !Not [!Equals [!Ref EmailAddress, '']]
-
-  EnableReporting: !Equals
-    - !Ref Reporting
-    - true
+  CreateEmailNotification: !Not [!Equals [!Ref EmailAddress, ""]]
 
 Mappings:
   ProwlerScanParameters:
@@ -167,20 +163,20 @@ Mappings:
     Intermediate:
       ProwlerOptions: --severity critical high
     Full:
-      ProwlerOptions: ''
+      ProwlerOptions: ""
   CodeBuildPerformanceOptionMap:
     Three:
       ParallelAccounts: 3
-      CodeBuildComputeType: BUILD_GENERAL1_SMALL
+      CodeBuildComputeType: BUILD_GENERAL1_MEDIUM
     Six:
       ParallelAccounts: 6
-      CodeBuildComputeType: BUILD_GENERAL1_MEDIUM
+      CodeBuildComputeType: BUILD_GENERAL1_LARGE
     Twelve:
       ParallelAccounts: 12
-      CodeBuildComputeType: BUILD_GENERAL1_LARGE
+      CodeBuildComputeType: BUILD_GENERAL1_XLARGE
     FortyEight:
       ParallelAccounts: 48
-      CodeBuildComputeType: BUILD_GENERAL1_XLARGE
+      CodeBuildComputeType: BUILD_GENERAL1_2XLARGE
 
 Resources:
   #This is the role that CodeBuild assumes to perform the Prowler scan
@@ -195,32 +191,32 @@ Resources:
           - id: W76
             reason: SPCM for IAM policy is higher than 25 due to managed polices, and additional polices. Each section of the role has a comment with the Prowler documentation describing the need for the privileges.
     Condition: CreateProwlerRole
-    Type: 'AWS::IAM::Role'
+    Type: "AWS::IAM::Role"
     Properties:
-      Path: '/service-role/'
+      Path: "/service-role/"
       RoleName: ProwlerMemberRole
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
-              AWS: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:root'
+              AWS: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:root"
             Action:
-              - 'sts:AssumeRole'
+              - "sts:AssumeRole"
             Condition:
               ArnEquals:
                 aws:PrincipalArn: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/service-role/ProwlerCodeBuildRole
       ManagedPolicyArns:
         # Prowler requires these managed polices to perform all the checks
         # https://docs.prowler.cloud/en/latest/getting-started/requirements/
-        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/SecurityAudit'
-        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/job-function/ViewOnlyAccess'
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/SecurityAudit"
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/job-function/ViewOnlyAccess"
       Policies:
         # Prowler requires these additional read-only permissions. They are documented in the Prowler documentation.
         # https://github.com/prowler-cloud/prowler/blob/master/permissions/prowler-additions-policy.json
         - PolicyName: ProwlerAdditions
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
               - Action:
                   - account:Get*
@@ -271,7 +267,7 @@ Resources:
                   - tag:GetTagKeys
                   - wellarchitected:List*
                 Effect: Allow
-                Resource: '*'
+                Resource: "*"
               - Action:
                   - apigateway:GET
                 Effect: Allow
@@ -296,9 +292,6 @@ Resources:
     DeletionPolicy: Retain
     Type: AWS::S3::Bucket
     Properties:
-      NotificationConfiguration:
-        EventBridgeConfiguration:
-          EventBridgeEnabled: !If [EnableReporting, true, false]
       VersioningConfiguration:
         Status: Enabled
       PublicAccessBlockConfiguration:
@@ -312,19 +305,19 @@ Resources:
         - Key: Environment
           Value: !Ref EnvironmentTag
   ProwlerFindingsBucketPolicy:
-    Type: 'AWS::S3::BucketPolicy'
+    Type: "AWS::S3::BucketPolicy"
     Properties:
       Bucket: !Ref ProwlerFindingsBucket
       PolicyDocument:
-        Version: '2012-10-17'
+        Version: "2012-10-17"
         Statement:
           - Sid: AllowSSLRequestsOnly
-            Principal: '*'
-            Action: 's3:*'
+            Principal: "*"
+            Action: "s3:*"
             Effect: Deny
             Resource:
-              - !Sub '${ProwlerFindingsBucket.Arn}'
-              - !Sub '${ProwlerFindingsBucket.Arn}/*'
+              - !Sub "${ProwlerFindingsBucket.Arn}"
+              - !Sub "${ProwlerFindingsBucket.Arn}/*"
             Condition:
               Bool:
                 aws:SecureTransport: false
@@ -336,16 +329,16 @@ Resources:
       ProjectName: !Ref ProwlerCodeBuild
 
   CodeBuildStartBuildLambdaRole:
-    Type: 'AWS::IAM::Role'
+    Type: "AWS::IAM::Role"
     Properties:
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
               Service: lambda.amazonaws.com
             Action:
-              - 'sts:AssumeRole'
+              - "sts:AssumeRole"
             Condition:
               StringEquals:
                 aws:SourceAccount: !Sub ${AWS::AccountId}
@@ -358,7 +351,7 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                  - 'codebuild:StartBuild'
+                  - "codebuild:StartBuild"
                 Resource: !GetAtt ProwlerCodeBuild.Arn
       Tags:
         - Key: Project
@@ -376,7 +369,7 @@ Resources:
     DeletionPolicy: Delete
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub '/aws/lambda/${CodeBuildStartBuildLambda}'
+      LogGroupName: !Sub "/aws/lambda/${CodeBuildStartBuildLambda}"
       RetentionInDays: 30
       Tags:
         - Key: Project
@@ -446,56 +439,61 @@ Resources:
             reason: This role is given an explicit name to further restrict the more permissive ProwlerMemberRole to only be assumed by this role.
     Type: AWS::IAM::Role
     Properties:
-      Path: '/service-role/'
+      Path: "/service-role/"
       RoleName: ProwlerCodeBuildRole
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: "2012-10-17"
         Statement:
-          - Action: 'sts:AssumeRole'
+          - Action: "sts:AssumeRole"
             Effect: Allow
             Principal:
               Service:
                 - codebuild.amazonaws.com
             Condition:
               StringEquals:
-                aws:SourceArn: !Sub 'arn:${AWS::Partition}:codebuild:${AWS::Region}:${AWS::AccountId}:project/ProwlerCodeBuild'
+                aws:SourceArn: !Sub "arn:${AWS::Partition}:codebuild:${AWS::Region}:${AWS::AccountId}:project/ProwlerCodeBuild"
       Policies:
         - PolicyName: LogGroup
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
               - Action:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Effect: Allow
-                Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*'
-        - PolicyName: UploadtoS3
+                Resource: !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*"
+        - PolicyName: S3Access
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
               - Action:
                   - s3:PutObject
+                  - s3:GetObject
                 Effect: Allow
-                Resource: !Sub '${ProwlerFindingsBucket.Arn}/*'
+                Resource: !Sub "${ProwlerFindingsBucket.Arn}/*"
+              - Action:
+                  - s3:ListBucket
+                Effect: Allow
+                Resource: !Sub "${ProwlerFindingsBucket.Arn}"
         - PolicyName: AssumeRole
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
               - Action:
                   - sts:AssumeRole
                 Effect: Allow
-                Resource: !Sub 'arn:${AWS::Partition}:iam::*:role/service-role/${ProwlerRole}'
+                Resource: !Sub "arn:${AWS::Partition}:iam::*:role/service-role/${ProwlerRole}"
         - PolicyName: ListOrganizationAccounts
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
               - Action:
                   - organizations:ListAccounts
                   - organizations:DescribeAccount
                   - organizations:ListTagsForResource
                 Effect: Allow
-                Resource: '*'
+                Resource: "*"
       Tags:
         - Key: Project
           Value: !Ref ProjectTag
@@ -516,23 +514,23 @@ Resources:
           !FindInMap [
             CodeBuildPerformanceOptionMap,
             !Ref ConcurrentAccountScans,
-            'CodeBuildComputeType',
+            "CodeBuildComputeType",
           ]
-        Image: 'aws/codebuild/amazonlinux2-x86_64-standard:5.0'
-        Type: 'LINUX_CONTAINER'
+        Image: "aws/codebuild/amazonlinux2-x86_64-standard:5.0"
+        Type: "LINUX_CONTAINER"
         EnvironmentVariables:
           - Name: BUCKET_REPORT
             Value: !Ref ProwlerFindingsBucket
             Type: PLAINTEXT
           - Name: PROWLER_OPTIONS
-            Value: !Ref 'ProwlerOptions'
+            Value: !Ref "ProwlerOptions"
             Type: PLAINTEXT
           - Name: PROWLER_SCAN_OPTIONS
             Value:
               !FindInMap [
                 ProwlerScanParameters,
                 !Ref ProwlerScanType,
-                'ProwlerOptions',
+                "ProwlerOptions",
               ]
             Type: PLAINTEXT
           - Name: PROWLER_ROLE
@@ -555,8 +553,17 @@ Resources:
               !FindInMap [
                 CodeBuildPerformanceOptionMap,
                 !Ref ConcurrentAccountScans,
-                'ParallelAccounts',
+                "ParallelAccounts",
               ]
+            Type: PLAINTEXT
+          - Name: REPORTING_ENABLED
+            Value: !Ref Reporting
+            Type: PLAINTEXT
+          - Name: SOURCE_REPO_URL
+            Value: !Ref SourceRepoUrl
+            Type: PLAINTEXT
+          - Name: SOURCE_REPO_BRANCH
+            Value: !Ref SourceRepoBranch
             Type: PLAINTEXT
       Description: Run Prowler assessment
       ServiceRole: !GetAtt ProwlerCodeBuildRole.Arn
@@ -572,23 +579,21 @@ Resources:
               runtime-versions:
                 python: 3.12
               commands:
-                - echo "Installing uv and Prowler..."
                 - |
+                  echo "Installing uv and Prowler..."
                   if ! curl -LsSf https://astral.sh/uv/install.sh | sh; then
                     echo "ERROR: Failed to install uv"
                     exit 1
                   fi
-                - source $HOME/.local/bin/env
-                - |
+                  source $HOME/.local/bin/env
                   if ! uv pip install --system prowler==5.26.1 --quiet; then
                     echo "ERROR: Failed to install Prowler"
                     exit 1
                   fi
-                - prowler -v
+                  python3 -m prowler -v
             build:
               commands:
                 - |
-
                   if [[ $MULTI_ACCOUNT_SCAN = 'true' ]]; then
 
                       echo "Running multi-account scan."
@@ -616,8 +621,8 @@ Resources:
                       for accountId in $account_list; do
                           test "$(jobs | wc -l)" -ge $PARALLEL_ACCOUNTS && wait || true
                           {
-                              echo "Running Prowler as prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$accountId:role/service-role/$PROWLER_ROLE "
-                              prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$accountId:role/service-role/$PROWLER_ROLE -b
+                              echo "Running Prowler as python3 -m prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$accountId:role/service-role/$PROWLER_ROLE "
+                              python3 -m prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$accountId:role/service-role/$PROWLER_ROLE -b
                               PROWLER_EXIT_CODE=$?
                               if [ $PROWLER_EXIT_CODE -ne 0 ]; then
                                   echo "ERROR: Prowler scan failed for account $accountId"
@@ -640,8 +645,8 @@ Resources:
                   elif [[ $MULTI_ACCOUNT_SCAN != 'true' ]]; then
 
                       echo "Running a single account scan."
-                      echo "Running Prowler as prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$AWS_ACCOUNT_ID:role/service-role/$PROWLER_ROLE "
-                      prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$AWS_ACCOUNT_ID:role/service-role/$PROWLER_ROLE -b
+                      echo "Running Prowler as python3 -m prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$AWS_ACCOUNT_ID:role/service-role/$PROWLER_ROLE "
+                      python3 -m prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$AWS_ACCOUNT_ID:role/service-role/$PROWLER_ROLE -b
                       PROWLER_EXIT_CODE=$?
                       if [ $PROWLER_EXIT_CODE -ne 0 ]; then
                           echo "ERROR: Prowler scan failed for account $AWS_ACCOUNT_ID with exit code $PROWLER_EXIT_CODE"
@@ -651,12 +656,11 @@ Resources:
                   fi
             post_build:
               commands:
-                - echo "CODEBUILD_BUILD_SUCCEEDING status is $CODEBUILD_BUILD_SUCCEEDING "
+                - echo "CODEBUILD_BUILD_SUCCEEDING status is $CODEBUILD_BUILD_SUCCEEDING"
                 - |
-
                   if [ $CODEBUILD_BUILD_SUCCEEDING -eq 0 ]; then
-                      echo "The previous build stage Failed. Exiting the post_build stage without uploading any results to S3 buckets";
-                      exit $CODEBUILD_BUILD_SUCCEEDING
+                      echo "The previous build stage Failed. Exiting the post_build stage without uploading any results to S3 buckets"
+                      exit 1
                   elif [ $CODEBUILD_BUILD_SUCCEEDING -eq 1 ]; then
                       echo "The build stage succeeded. Now uploading reports to S3 bucket ..."
 
@@ -704,6 +708,41 @@ Resources:
                       fi
 
                       echo "All reports uploaded successfully!"
+
+                      # Generate security insights dashboard if reporting is enabled
+                      if [[ "$REPORTING_ENABLED" == "true" ]]; then
+                          echo "Generating security insights dashboard..."
+
+                          echo "Downloading reporting code from $SOURCE_REPO_URL (branch: $SOURCE_REPO_BRANCH)..."
+                          if ! git clone --branch $SOURCE_REPO_BRANCH --single-branch --depth 1 $SOURCE_REPO_URL repo; then
+                              echo "ERROR: Failed to clone repository"
+                              exit 1
+                          fi
+
+                          REPORTING_DIR="repo/reporting"
+
+                          echo "Installing reporting dependencies..."
+                          source $HOME/.local/bin/env
+                          if ! uv pip install --system -r $REPORTING_DIR/requirements.txt --quiet; then
+                              echo "ERROR: Failed to install reporting dependencies"
+                              exit 1
+                          fi
+
+                          echo "Generating dashboard from s3://$BUCKET_REPORT/csv/..."
+                          cd $REPORTING_DIR
+                          if ! python generate_cspm_scan_insights.py --output-dir "s3://$BUCKET_REPORT/csv" --dashboard-file cspm_scan_insights.html; then
+                              echo "ERROR: Failed to generate security insights dashboard"
+                              exit 1
+                          fi
+
+                          echo "Uploading dashboard to S3..."
+                          if ! aws s3 cp cspm_scan_insights.html s3://$BUCKET_REPORT/reports/; then
+                              echo "ERROR: Failed to upload dashboard to S3"
+                              exit 1
+                          fi
+
+                          echo "Dashboard successfully uploaded to s3://$BUCKET_REPORT/reports/cspm_scan_insights.html"
+                      fi
                   fi
       Tags:
         - Key: Project
@@ -721,7 +760,7 @@ Resources:
     DeletionPolicy: Delete
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub '/aws/codebuild/${ProwlerCodeBuild}'
+      LogGroupName: !Sub "/aws/codebuild/${ProwlerCodeBuild}"
       RetentionInDays: 30
       Tags:
         - Key: Project
@@ -753,12 +792,12 @@ Resources:
     Properties:
       PolicyDocument:
         Id: snsNotificationsPolicy
-        Version: '2012-10-17'
+        Version: "2012-10-17"
         Statement:
           - Sid: Allow events
             Effect: Allow
             Principal:
-              Service: 'events.amazonaws.com'
+              Service: "events.amazonaws.com"
             Action:
               - sns:Publish
             Resource: !Ref ProwlerScanNotificationTopic
@@ -800,283 +839,6 @@ Resources:
         - Key: Environment
           Value: !Ref EnvironmentTag
 
-  # Security Insights Dashboard Reporting
-  ProwlerReportingLambdaRole:
-    Condition: EnableReporting
-    Type: 'AWS::IAM::Role'
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action:
-              - 'sts:AssumeRole'
-            Condition:
-              StringEquals:
-                aws:SourceAccount: !Sub ${AWS::AccountId}
-      Path: /
-      ManagedPolicyArns:
-        - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-      Policies:
-        - PolicyName: AccessToCodeBuild
-          PolicyDocument:
-            Statement:
-              - Effect: Allow
-                Action:
-                  - 'codebuild:StartBuild'
-                Resource: !GetAtt ProwlerReportingCodeBuild.Arn
-      Tags:
-        - Key: Project
-          Value: !Ref ProjectTag
-        - Key: Environment
-          Value: !Ref EnvironmentTag
-
-  ProwlerReportingLogGroup:
-    Condition: EnableReporting
-    Metadata:
-      cfn_nag:
-        rules_to_suppress:
-          - id: W84
-            reason: CloudWatch Logs protects data at rest using encryption. All log groups are encrypted. By default, the CloudWatch Logs service manages the server-side encryption keys.
-    UpdateReplacePolicy: Delete
-    DeletionPolicy: Delete
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub '/aws/lambda/${ProwlerReportingLambda}'
-      RetentionInDays: 30
-      Tags:
-        - Key: Project
-          Value: !Ref ProjectTag
-        - Key: Environment
-          Value: !Ref EnvironmentTag
-
-  ProwlerReportingLambda:
-    Condition: EnableReporting
-    Metadata:
-      cfn_nag:
-        rules_to_suppress:
-          - id: W58
-            reason: The ProwlerReportingLambdaRole gives Lambda access to write CloudWatch logs.
-          - id: W89
-            reason: Lambda is not deployed inside of a VPC.
-          - id: W92
-            reason: Reserved concurrent executions is not set.
-    Type: AWS::Lambda::Function
-    Properties:
-      Handler: index.lambda_handler
-      Role: !Sub ${ProwlerReportingLambdaRole.Arn}
-      Timeout: 120
-      Runtime: python3.12
-      Environment:
-        Variables:
-          CODEBUILD_PROJECT_NAME: !Ref ProwlerReportingCodeBuild
-      Code:
-        ZipFile: |
-          import os
-          import boto3
-          from botocore.exceptions import ClientError
-
-          def startCodeBuildReport(event, context):
-              print(event)
-              print("Starting reporting CodeBuild to generate security insights dashboard...")
-
-              project_name = os.environ['CODEBUILD_PROJECT_NAME']
-              cb = boto3.client('codebuild')
-              try:
-                print(f"Starting build for project: {project_name}")
-                response = cb.start_build(projectName=project_name)
-                print(response)
-              except ClientError as e:
-                print("Failed to start CodeBuild")
-                print(e)
-
-          def lambda_handler(event,context):
-              startCodeBuildReport(event, context)
-      Tags:
-        - Key: Project
-          Value: !Ref ProjectTag
-        - Key: Environment
-          Value: !Ref EnvironmentTag
-
-  ProwlerReportingLambdaInvokePermission:
-    Condition: EnableReporting
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !GetAtt ProwlerReportingLambda.Arn
-      Action: 'lambda:InvokeFunction'
-      Principal: 'events.amazonaws.com'
-      SourceArn: !GetAtt ProwlerReportingTrigger.Arn
-
-  ProwlerReportingTrigger:
-    Condition: EnableReporting
-    Type: AWS::Events::Rule
-    Properties:
-      EventBusName: default
-      EventPattern:
-        source:
-          - aws.codebuild
-        detail-type:
-          - CodeBuild Build State Change
-        detail:
-          build-status:
-            - SUCCEEDED
-          project-name:
-            - !Ref ProwlerCodeBuild
-      State: ENABLED
-      Targets:
-        - Id: toLambda
-          Arn: !GetAtt ProwlerReportingLambda.Arn
-      Tags:
-        - Key: Project
-          Value: !Ref ProjectTag
-        - Key: Environment
-          Value: !Ref EnvironmentTag
-
-  ProwlerReportingCodeBuildRole:
-    Condition: EnableReporting
-    Type: AWS::IAM::Role
-    Properties:
-      Path: '/service-role/'
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Action: 'sts:AssumeRole'
-            Effect: Allow
-            Principal:
-              Service:
-                - codebuild.amazonaws.com
-            Condition:
-              StringEquals:
-                aws:SourceArn: !Sub 'arn:${AWS::Partition}:codebuild:${AWS::Region}:${AWS::AccountId}:project/ProwlerReportingCodeBuild'
-      Policies:
-        - PolicyName: LogGroup
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Action:
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Effect: Allow
-                Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*'
-        - PolicyName: AccessToS3
-          PolicyDocument:
-            Statement:
-              - Effect: Allow
-                Action:
-                  - s3:GetBucketLocation
-                  - s3:GetObject
-                  - s3:ListBucket
-                  - s3:ListBucketMultipartUploads
-                  - s3:AbortMultipartUpload
-                  - s3:PutObject
-                  - s3:ListMultipartUploadParts
-                Resource:
-                  - !GetAtt ProwlerFindingsBucket.Arn
-                  - !Sub ${ProwlerFindingsBucket.Arn}/*
-      Tags:
-        - Key: Project
-          Value: !Ref ProjectTag
-        - Key: Environment
-          Value: !Ref EnvironmentTag
-
-  ProwlerReportingCodeBuild:
-    Condition: EnableReporting
-    Metadata:
-      cfn_nag:
-        rules_to_suppress:
-          - id: W32
-            reason: CodeBuild uses the managed KMS key for S3.
-    Type: AWS::CodeBuild::Project
-    Properties:
-      Name: ProwlerReportingCodeBuild
-      Environment:
-        ComputeType: 'BUILD_GENERAL1_SMALL'
-        Image: 'aws/codebuild/amazonlinux2-x86_64-standard:5.0'
-        Type: 'LINUX_CONTAINER'
-        EnvironmentVariables:
-          - Name: BUCKET_REPORT
-            Value: !Ref ProwlerFindingsBucket
-            Type: PLAINTEXT
-          - Name: SOURCE_REPO_URL
-            Value: !Ref SourceRepoUrl
-            Type: PLAINTEXT
-          - Name: SOURCE_REPO_BRANCH
-            Value: !Ref SourceRepoBranch
-            Type: PLAINTEXT
-      Description: Create Prowler report
-      ServiceRole: !GetAtt ProwlerReportingCodeBuildRole.Arn
-      TimeoutInMinutes: 60
-      Artifacts:
-        Type: NO_ARTIFACTS
-      Source:
-        Type: NO_SOURCE
-        BuildSpec: |
-          version: 0.2
-          phases:
-            install:
-              runtime-versions:
-                python: 3.12
-              commands:
-                - echo "Installing uv..."
-                - |
-                  if ! curl -LsSf https://astral.sh/uv/install.sh | sh; then
-                    echo "ERROR: Failed to install uv"
-                    exit 1
-                  fi
-                - source $HOME/.local/bin/env
-                - echo "Downloading repo from $SOURCE_REPO_URL (branch: $SOURCE_REPO_BRANCH)..."
-                - |
-                  if ! git clone --branch $SOURCE_REPO_BRANCH --single-branch $SOURCE_REPO_URL; then
-                    echo "ERROR: Failed to clone repository $SOURCE_REPO_URL (branch: $SOURCE_REPO_BRANCH)"
-                    exit 1
-                  fi
-                - |
-                  # Extract repo directory name from URL
-                  REPO_DIR=$(basename "$SOURCE_REPO_URL" .git)
-                  echo "REPO_DIR=$REPO_DIR" >> $CODEBUILD_SRC_DIR/env.sh
-                  REPORTING_DIR="$REPO_DIR/reporting"
-                  echo "REPORTING_DIR=$REPORTING_DIR" >> $CODEBUILD_SRC_DIR/env.sh
-                - source $CODEBUILD_SRC_DIR/env.sh
-                - echo "Installing dependencies from $REPORTING_DIR..."
-                - |
-                  if ! uv pip install --system -r $REPORTING_DIR/requirements.txt --quiet; then
-                    echo "ERROR: Failed to install Python dependencies"
-                    exit 1
-                  fi
-            build:
-              commands:
-                - source $CODEBUILD_SRC_DIR/env.sh
-                - echo "Generating security insights dashboard from s3://$BUCKET_REPORT/csv/"
-                - |
-                  cd $REPORTING_DIR
-                  if ! python generate_cspm_scan_insights.py --output-dir "s3://$BUCKET_REPORT/csv" --dashboard-file cspm_scan_insights.html; then
-                    echo "ERROR: Failed to generate security insights dashboard"
-                    exit 1
-                  fi
-            post_build:
-              commands:
-                - source $CODEBUILD_SRC_DIR/env.sh
-                - |
-                  if [ "$CODEBUILD_BUILD_SUCCEEDING" = "0" ]; then
-                    echo "ERROR: Build phase failed. Skipping dashboard upload."
-                    exit 1
-                  fi
-                - echo "Uploading html dashboard to S3..."
-                - |
-                  if ! aws s3 cp $REPORTING_DIR/cspm_scan_insights.html s3://$BUCKET_REPORT/reports/; then
-                    echo "ERROR: Failed to upload dashboard to S3"
-                    exit 1
-                  fi
-                - echo "Dashboard successfully uploaded to s3://$BUCKET_REPORT/reports/cspm_scan_insights.html"
-      Tags:
-        - Key: Project
-          Value: !Ref ProjectTag
-        - Key: Environment
-          Value: !Ref EnvironmentTag
-
 Outputs:
   AccountID:
     Description: Account ID where Prowler is running
@@ -1095,24 +857,13 @@ Outputs:
     Value: !Sub "https://s3.console.aws.amazon.com/s3/buckets/${ProwlerFindingsBucket}"
 
   DashboardS3Path:
-    Condition: EnableReporting
-    Description: S3 path to the security insights dashboard
+    Description: S3 path to the security insights dashboard (when reporting is enabled)
     Value: !Sub "s3://${ProwlerFindingsBucket}/reports/cspm_scan_insights.html"
 
   ProwlerCodeBuildProject:
     Description: Name of the Prowler scan CodeBuild project
     Value: !Ref ProwlerCodeBuild
 
-  ReportingCodeBuildProject:
-    Condition: EnableReporting
-    Description: Name of the reporting CodeBuild project
-    Value: !Ref ProwlerReportingCodeBuild
-
   ProwlerCodeBuildConsoleUrl:
     Description: CodeBuild console URL for Prowler scans
     Value: !Sub "https://${AWS::Region}.console.aws.amazon.com/codesuite/codebuild/projects/${ProwlerCodeBuild}"
-
-  ReportingCodeBuildConsoleUrl:
-    Condition: EnableReporting
-    Description: CodeBuild console URL for reporting
-    Value: !Sub "https://${AWS::Region}.console.aws.amazon.com/codesuite/codebuild/projects/${ProwlerReportingCodeBuild}"

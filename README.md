@@ -1,17 +1,23 @@
-## Self-Service Security Assessment Solutions (v2.0)<!-- omit from toc -->
+## Security Assessment Solution<!-- omit from toc -->
 
 Cybersecurity remains a very important topic and point of concern for many CIOs, CISOs, and their customers. To meet these important concerns, AWS has developed a primary set of services customers should use to aid in protecting their accounts. [Amazon GuardDuty](https://aws.amazon.com/guardduty/), [AWS Security Hub](https://aws.amazon.com/security-hub/), [AWS Config](https://aws.amazon.com/config/), and [AWS Well-Architected](https://aws.amazon.com/architecture/well-architected/?wa-lens-whitepapers.sort-by=item.additionalFields.sortDate&wa-lens-whitepapers.sort-order=desc&wa-guidance-whitepapers.sort-by=item.additionalFields.sortDate&wa-guidance-whitepapers.sort-order=desc) reviews help customers maintain a strong security posture over their AWS accounts. As more organizations deploy to the cloud, especially if they are doing so quickly, and they have not yet implemented the recommended AWS Services, there may be a need to conduct a rapid security assessment of the cloud environment.
 
-We have developed an inexpensive, easy to deploy, secure, and fast solution to provide our customers with a security assessment report. These reports are generated using the open source project [Prowler](https://github.com/prowler-cloud/prowler) (v5.26.1). Prowler performs point in time security assessment based on AWS best practices and can help quickly identify any potential risk areas in a customer’s deployed environment. If you are interested in conducting these assessments on a continuous basis, AWS recommends enabling Security Hub’s [Foundational Security Best Practices standard](https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-standards-fsbp.html). If you are interested in integrating your Prowler assessment results with Security Hub, you can follow the instructions in the [Prowler Documentation](https://docs.prowler.cloud/en/latest/tutorials/aws/securityhub/).
+We have developed an inexpensive, easy to deploy, secure, and fast solution to provide our customers with a security assessment report. These reports are generated using the open source project [Prowler](https://github.com/prowler-cloud/prowler). Prowler performs point-in-time security assessments based on AWS best practices and can help quickly identify any potential risk areas in a customer’s deployed environment. If you are interested in conducting these assessments on a continuous basis, AWS recommends enabling Security Hub’s [Foundational Security Best Practices standard](https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-standards-fsbp.html). If you are interested in integrating your Prowler assessment results with Security Hub, you can follow the instructions in the [Prowler Documentation](https://docs.prowler.cloud/en/latest/tutorials/aws/securityhub/).
 
 >Note: Prowler is not an AWS owned solution. Customers should independently review Prowler before running this solution. Any dependencies associated with Prowler should be kept up to date.
 
 
->**Fork note:** This repository is forked from [awslabs/aws-security-assessment-solution](https://github.com/awslabs/aws-security-assessment-solution). The Athena/Glue reporting pipeline has been removed and replaced with a self-contained HTML security insights dashboard. It also includes Prowler v5.26.1 (latest as of May 15, 2026).
+>**Fork note:** This repository is forked from [awslabs/aws-security-assessment-solution](https://github.com/awslabs/aws-security-assessment-solution). The Athena/Glue reporting pipeline has been removed and replaced with a self-contained HTML security insights dashboard.
 
 ## Table of Contents<!-- omit from toc -->
 - [Overview](#overview)
 - [Parameters](#parameters)
+- [Scan types](#scan-types)
+  - [Basic Scan](#basic-scan)
+  - [Intermediate scan](#intermediate-scan)
+  - [Full scan](#full-scan)
+- [Notifications](#notifications)
+- [Reporting](#reporting)
 - [Deployment](#deployment)
 - [Single account scan](#single-account-scan)
   - [AWS CloudShell](#aws-cloudshell)
@@ -27,14 +33,7 @@ We have developed an inexpensive, easy to deploy, secure, and fast solution to p
     - [Step 2: Enable delegated administrator for AWS Organizations](#step-2-enable-delegated-administrator-for-aws-organizations)
     - [Step 3: Deploy the SATv2 solution](#step-3-deploy-the-satv2-solution)
 - [Review the results](#review-the-results)
-  - [Security Insights Dashboard (recommended)](#security-insights-dashboard-recommended)
   - [Prowler Dashboard](#prowler-dashboard)
-- [Scan types](#scan-types)
-  - [Basic Scan](#basic-scan)
-  - [Intermediate scan](#intermediate-scan)
-  - [Full scan](#full-scan)
-- [Notifications](#notifications)
-- [Reporting](#reporting)
 - [Frequently Asked Questions (FAQ)](#frequently-asked-questions-faq)
 - [Clean Up](#clean-up)
 - [Security](#security)
@@ -45,7 +44,7 @@ The solution is deployed with [AWS CloudFormation](https://aws.amazon.com/cloudf
 
 The parameter (user input) defaults will run an intermediate scan (all critical and high severity checks) in a single account with reporting enabled. However, you can choose different parameters to run more or less extensive scans or to scan multiple accounts. The deployment process takes less than 5 minutes to complete. The solution’s AWS CloudFormation templates are provided for review in this Github repository.
 
-Once the template is deployed, the CodeBuild project will run. The time to complete a security assessment will vary depending on the number of resources and the scan options selected. At the end of the assessments the reports are delivered to the created S3 Bucket. When reporting is enabled (default), a security insights dashboard is automatically generated after the scan completes.
+Once the template is deployed, the CodeBuild project will run. The time to complete a security assessment will vary depending on the number of resources and the scan options selected. At the end of the assessments, the reports are delivered to the created S3 bucket. When reporting is enabled (default), a security insights dashboard is automatically generated after the scan completes.
 
 ![architecture diagram](img/architecture.png)
 
@@ -64,14 +63,118 @@ SATv2 can be customized by updating the CloudFormation parameters. This section 
 | MultiAccountListOverride | Specify a space delimited list of 12-digit account IDs to scan. Leaving this blank will scan all accounts in your organization. Ensure that you have set `MultiAccountScan` parameter above to true if you want to scan specific accounts. If you can't provide delegated ListAccount access, you can provide the MultiAccountListOverride parameter. | | [Multi-account scan](#multi-account-scan) |
 | ProwlerOptions           | Specify the parameters for Prowler. The --role and ARN will automatically be added to the end of the parameters you specify. This can also be used to specify a single check.                                                                                                                                                             |                | [Full scan](#full-scan)                   |
 | ProwlerRole              | The role that Prowler should assume to perform the scan. Change this if you want to specify your own role with different permissions.                                                                                                                                                                                                     | ProwlerMemberRole |
-| SourceRepoUrl            | Git repository URL for the reporting code. Must be from trusted GitHub organizations (awslabs, aws, agasthik).                                                                                                                                                                                                                            | awslabs/aws-security-assessment-solution |
+| SourceRepoUrl            | Git repository URL for the reporting code. Must be from trusted GitHub organizations (awslabs, aws, agasthik).                                                                                                                                                                                                                            | agasthik/aws-security-assessment-solution |
 | SourceRepoBranch         | Git branch to use for the reporting code.                                                                                                                                                                                                                                                                                                 | main           |
 | ProjectTag               | Project name for resource tagging and cost allocation.                                                                                                                                                                                                                                                                                    | SecurityAssessment |
 | EnvironmentTag           | Environment name for resource tagging (Production, Development, Staging, Test).                                                                                                                                                                                                                                                           | Production     |
 
 
+## Scan types
+
+By default, SATv2 will run an intermediate scan which includes all critical and high severity checks. You can choose to run a basic or full scan by choosing a different ProwlerScanType parameter value.
+
+For example, a single account scan using the basic scan option would use this command:
+
+```bash
+aws cloudformation deploy --template-file 2-sat2-codebuild-prowler.yaml \
+--stack-name sat2-prowler \
+--capabilities CAPABILITY_NAMED_IAM \
+--parameter-overrides ProwlerScanType=Basic
+```
+
+Checks are frequently added. To see the latest checks, run the `prowler aws --list-checks` command. An example has been provided below for each check level.
+
+### Basic Scan
+To see a list of checks, review [basic checks](./checks/basic_checks.txt).
+
+### Intermediate scan
+To see a list of checks, review [intermediate checks](./checks/intermediate_checks.txt).
+
+This scan will add `--severity critical high` to the Prowler scan options. With this selected, Prowler will run all security checks that result in critical or high severity.
+
+### Full scan
+To see a list of checks, review [full checks](./checks/full_checks.txt).
+
+This option doesn't add any additional parameters to the Prowler scan and will run all available Prowler checks.
+
+You can also use the full scan to customize the scan however you would like.
+
+For **ProwlerScanType** choose **Full**.
+
+For **ProwlerOptions**, append the check. For example, to check only if GuardDuty is enabled, enter:
+
+`aws --ignore-exit-code-3 -c guardduty_is_enabled`
+
+## Notifications
+
+You can optionally specify an email address in the EmailAddress parameter when you deploy the CloudFormation template. This will create an SNS topic and send an email when the CodeBuild job completes.
+
+This may be helpful when running longer scans or scanning many accounts.
+
+For example, a single account scan with email notifications would use this command:
+
+```bash
+aws cloudformation deploy --template-file 2-sat2-codebuild-prowler.yaml \
+--stack-name sat2-prowler \
+--capabilities CAPABILITY_NAMED_IAM \
+--parameter-overrides EmailAddress=email@domain.com
+```
+
+With or without the optional EmailAddress parameter set, you can view the progress in the CodeBuild console.
+1. Navigate to the [CodeBuild console](https://console.aws.amazon.com/codesuite/).
+
+2. In the navigation pane, under **Build**, choose **Build projects**.
+
+3. Choose the Build project that begins with **ProwlerCodeBuild-**.
+
+4. Under Build history, you will see the last run.
+
+    ![CodeBuild project](/img/codebuild-project.png)
+
+5. Optionally, you can choose **Start build** to run another scan with the options you chose when you deployed the solution.
+
+## Reporting
+
+Reporting is enabled by default. When enabled, the CodeBuild project automatically generates a security insights dashboard after the Prowler scan completes:
+1. Clones the reporting code from the configured repository
+2. Reads the Prowler CSV output files from S3
+3. Generates an interactive HTML dashboard (`cspm_scan_insights.html`)
+4. Uploads the dashboard to the `reports/` folder in the same S3 bucket
+
+The dashboard is a standalone HTML file that provides interactive visualizations and analysis of your security findings. It includes:
+- **Multi-Account Analysis** — Process security findings from multiple accounts, subscriptions, or projects simultaneously
+- **Summary cards** — Critical, High, Total findings, and Account count at a glance
+- **Severity distribution** — Pie chart showing the breakdown of findings by severity
+- **Account comparison** — Stacked bar chart comparing the top accounts by finding count
+- **Service risk analysis** — Dual-axis chart showing risk scores and failure counts per service
+- **Top failing checks** — Horizontal bar chart of the most common security failures
+- **Regional distribution** — Findings broken down by AWS Region
+- **Improvement roadmap** — Prioritized remediation plan with effort estimates (Immediate, Short-term, Long-term)
+
+<details>
+    <summary>Show dashboard preview</summary>
+
+   ![Security Insights Dashboard](/img/cspm_security_scan_insights-sample.png)
+
+</details>
+
+>Note: Compliance-specific findings are not summarized in this report. Use the [Prowler Dashboard's](#prowler-dashboard) compliance check screen for detailed compliance standards review.
+
+If you specify an email address while reporting is enabled, you will get an email when the scan is finished.
+
+For example, a multi-account scan with reporting and email alerts enabled would use this command:
+
+```bash
+aws cloudformation deploy --template-file 2-sat2-codebuild-prowler.yaml \
+--stack-name sat2-prowler \
+--capabilities CAPABILITY_NAMED_IAM \
+--parameter-overrides MultiAccountScan=true Reporting=true EmailAddress=email@domain.com
+```
+
+To disable reporting, set the `Reporting` parameter to `false` when deploying the CloudFormation template.
+
 ## Deployment
-You can use this project to run Prowler across multiple accounts in an AWS Organization, or a single account. We provide instructions to use  AWS CloudShell or the AWS console. Choose an option to get started.
+You can use this project to run Prowler across multiple accounts in an AWS Organization, or a single account. We provide instructions to use AWS CloudShell or the AWS Console. Choose an option to get started.
 
 | Deployment Type | AWS CloudShell            | AWS console            |
 | --------------- | ------------------------- | ---------------------- |
@@ -89,19 +192,19 @@ To run the Self-Service Security Assessment solution (SATv2) against a single ac
 
 #### Deploy the solution
 
-1. Login to your AWS account.
+1. Log in to your AWS account.
 
 2. In the navigation bar, choose [AWS CloudShell](https://console.aws.amazon.com/cloudshell/home).
 
 3. To download the CloudFormation template, enter the following command.
     ```bash
-    wget https://raw.githubusercontent.com/awslabs/aws-security-assessment-solution/main/2-sat2-codebuild-prowler.yaml
+    wget https://raw.githubusercontent.com/agasthik/aws-security-assessment-solution/main/2-sat2-codebuild-prowler.yaml
     ```
 
 4. To deploy the CloudFormation template, enter the following command.
 
     ```bash
-    aws cloudformation deploy --template-file 2-sat2-codebuild-prowler.yaml --stack-name sat2 --capabilities CAPABILITY_NAMED_IAM
+    aws cloudformation deploy --template-file 2-sat2-codebuild-prowler.yaml --stack-name sat2-prowler --capabilities CAPABILITY_NAMED_IAM
     ```
 
 </details>
@@ -114,14 +217,14 @@ To run the Self-Service Security Assessment solution (SATv2) against a single ac
 
 #### Deploy the solution
 
-1. Download the [2-sat2-codebuild-prowler.yaml](https://github.com/awslabs/aws-security-assessment-solution/blob/main/2-sat2-codebuild-prowler.yaml) CloudFormation template.
+1. Download the [2-sat2-codebuild-prowler.yaml](https://github.com/agasthik/aws-security-assessment-solution/blob/main/2-sat2-codebuild-prowler.yaml) CloudFormation template.
 2. Navigate to the [AWS CloudFormation console](https://console.aws.amazon.com/cloudformation).
 3. In the navigation pane, choose **Stacks**.
 4. Choose **Create stack**.
 5. Under Specify template, select **Upload a template file**.
 6. Choose **2-sat2-codebuild-prowler.yaml** you downloaded in step 1.
 7. Choose **Next**.
-8. For Stack name, enter **sat2**.
+8. For Stack name, enter **sat2-prowler**.
 9. Choose **Next**.
 10. On the Configure stack options page, choose **Next**.
 11. On the Review SAS page, select the box **I acknowledge that AWS CloudFormation might create IAM resources.** and choose **Submit**.
@@ -130,7 +233,7 @@ To run the Self-Service Security Assessment solution (SATv2) against a single ac
 
 
 ## Multi-account scan
-Self-Service Security Assessment solution (SAT) also supports multi-account scans. You must deploy a prerequisite role to each account you want to perform the scan on. To run SATv2 for multiple accounts, follow the instructions below. You can choose to use the AWS CLI or the AWS Console.
+The Self-Service Security Assessment solution (SAT) also supports multi-account scans. You must deploy a prerequisite role to each account you want to scan. To run SATv2 for multiple accounts, follow the instructions below. You can choose to use the AWS CLI or the AWS Console.
 
 These instructions assume you already have the prerequisites for stack set operations. For more information, visit the [AWS CloudFormation User Guide](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacksets-prereqs.html).
 
@@ -143,13 +246,13 @@ These instructions assume you already have the prerequisites for stack set opera
 
 #### Step 1: Deploy prerequisite role
 
-1. Login to your AWS Management account.
+1. Log in to your AWS Management account.
 2. In the navigation bar, choose [AWS CloudShell](https://console.aws.amazon.com/cloudshell/home).
-3. Identify which account you will run the Prowler scan from. Customers typically use a security tooling account, or audit account. Take note of the account ID for the **ProwlerAccountID** parameter.
+3. Identify which account you will run the Prowler scan from. Customers typically use a security tooling account or audit account. Take note of the account ID for the **ProwlerAccountID** parameter.
 4. To download the CloudFormation template, enter the following command.
 
     ```bash
-    wget https://raw.githubusercontent.com/awslabs/aws-security-assessment-solution/main/1-sat2-member-roles.yaml
+    wget https://raw.githubusercontent.com/agasthik/aws-security-assessment-solution/main/1-sat2-member-roles.yaml
     ```
 
 
@@ -195,7 +298,7 @@ These instructions assume you already have the prerequisites for stack set opera
     aws organizations describe-resource-policy
     ```
 
-8. If you don't have a delegated admin or a resource policy you can use the following commands to add the appropriate access.
+8. If you don't have a delegated admin or a resource policy, you can use the following commands to add the appropriate access.
 
     >Note: If you can't provide delegated ListAccount access, you can provide the MultiAccountListOverride parameter in the `2-sat2-codebuild-prowler template`.
 
@@ -204,7 +307,7 @@ These instructions assume you already have the prerequisites for stack set opera
     8a. Use the following command to delegate an admin if you do not already have one. Replace **\<aws-account-id\>** with the account ID you will run Prowler from.
 
     ```bash
-    aws organizations register-delegated-administrator <aws-account-id>
+    aws organizations register-delegated-administrator --account-id <aws-account-id> --service-principal organizations.amazonaws.com
     ```
 
     8b. Use the following commands to add a resource policy.
@@ -239,7 +342,7 @@ These instructions assume you already have the prerequisites for stack set opera
 1. To download the template, open AWS CloudShell in the **Prowler account** and enter the following command.
 
     ```bash
-    wget https://raw.githubusercontent.com/awslabs/aws-security-assessment-solution/main/2-sat2-codebuild-prowler.yaml
+    wget https://raw.githubusercontent.com/agasthik/aws-security-assessment-solution/main/2-sat2-codebuild-prowler.yaml
     ```
 
 2. To deploy the template in the Prowler account. Set **MultiAccountScan** to **true** to scan all the accounts in your organization.
@@ -356,52 +459,39 @@ Determine if you have delegated administrator or a resource policy that already 
 </details>
 
 ## Review the results
-After the solution is deployed, a Lambda function starts the CodeBuild project. After the CodeBuild project is finished building, the Prowler results will be uploaded to the created Amazon S3 bucket. If you configured [notifications](#notifications), you will get an email when the Prowler scan is complete. If reporting is enabled (default), a security insights dashboard will be automatically generated in the `/reports` folder.
+After the solution is deployed, a Lambda function starts the CodeBuild project. After the CodeBuild project finishes, the Prowler results will be uploaded to the created Amazon S3 bucket. If you configured [notifications](#notifications), you will get an email when the Prowler scan is complete. If [reporting](#reporting) is enabled (default), a security insights dashboard will be automatically generated in the `reports/` folder.
 
 If you didn't configure email alerts, you can monitor the progress from the [CodeBuild console](https://console.aws.amazon.com/codesuite/codebuild/projects).
 
 To review the results, follow these steps.
 
-1. Navigate to the Amazon S3 console in the account you deployed Prowler.
+1. Navigate to the Amazon S3 console in the account where you deployed Prowler.
 
 2. Select the bucket that starts with **sat2-prowler-prowlerfindingsbucket-**
 
-3. Choose the folder with the date and time of the scan.
+3. The bucket contains folders organized by output type: `csv/`, `html/`, `json/`, `ocsf-json/`, `asff-json/`, `compliance/`, and `reports/`.
 
-4. For each account, there will be 4 file types (csv, html, json, json-ocsf) in the format `prowler-output-<aws-account-id>-<datetime>`.
+4. **Security Insights Dashboard (recommended):** Open the `reports/` folder and select **cspm_scan_insights.html**, then choose **Open**. See [Reporting](#reporting) for details on dashboard contents.
 
-5. Select one of the html objects.
+5. To view Prowler's HTML reports, open the `html/` folder. Files are named `prowler-output-<aws-account-id>-<datetime>.html`.
 
-6. Choose **Open**.
+6. Select one of the HTML objects.
+
+7. Choose **Open**.
 
    ![Prowler Output](/img/prowler-output.png)
 
-7. A new window will open with your report. You can use the filters to identify and prioritize the findings.
+8. A new window will open with your report. You can use the filters to identify and prioritize the findings.
+
+<details>
+    <summary>Show Prowler report preview</summary>
 
    ![Prowler findings](/img/prowler-findings.png)
 
-### Security Insights Dashboard (recommended)
-If reporting is enabled (default), a security insights dashboard is automatically generated after the Prowler scan completes. The dashboard is a standalone HTML file that provides interactive visualizations and analysis of your security findings.
-
-The dashboard includes:
-- **Summary cards** — Critical, High, Total findings, and Account count at a glance
-- **Severity distribution** — Pie chart showing the breakdown of findings by severity
-- **Account comparison** — Stacked bar chart comparing the top accounts by finding count
-- **Service risk analysis** — Dual-axis chart showing risk scores and failure counts per service
-- **Top failing checks** — Horizontal bar chart of the most common security failures
-- **Compliance gap analysis** — Violations mapped to frameworks (CIS, SOC2, PCI-DSS, HIPAA, ISO27001, GDPR)
-- **Regional distribution** — Findings broken down by AWS Region
-- **Improvement roadmap** — Prioritized remediation plan with effort estimates (Immediate, Short-term, Long-term)
-
-To view the dashboard:
-
-1. Navigate to the S3 bucket and open the `reports/` folder.
-2. Select **cspm_scan_insights.html**, choose **Open**.
-
-   ![Security Insights Dashboard](/img/cspm_security_scan_insights-sample.png)
+</details>
 
 ### Prowler Dashboard
-Prowler has a built in dashboard to review the results. To use the Prowler dashboard, Prowler must be installed locally and you must download the results of Prowler locally.
+Prowler has a built-in dashboard to review the results. To use the Prowler dashboard, Prowler must be installed locally and you must download the results of Prowler locally.
 
 You must have the AWS Command Line Interface (CLI) and valid credentials. For more information, review the [AWS Command Line interface user guide](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-welcome.html).
 
@@ -426,104 +516,71 @@ You must have the AWS Command Line Interface (CLI) and valid credentials. For mo
     prowler dashboard
     ```
 
-## Scan types
-
-By default, SATv2 will run an intermediate scan which includes all critical and high severity checks (250+). You can choose to run a basic or full scan by choosing a different ProwlerScanType parameter value.
-
-For example, a single account scan using the basic scan option would use this command:
-
-```bash
-aws cloudformation deploy --template-file 2-sat2-codebuild-prowler.yaml \
---stack-name sat2-prowler \
---capabilities CAPABILITY_NAMED_IAM \
---parameter-overrides ProwlerScanType=Basic
-```
-
-Checks are frequently added, to see the latest checks, run `prowler aws --list-checks` command. An example has been provided below for each check level.
-
-### Basic Scan
-To see a list of checks, review [basic checks](./checks/basic_checks.txt).
-
-### Intermediate scan
-To see a list of checks, review [intermediate checks](./checks/intermediate_checks.txt).
-
-This scan will add `--severity critical high` to the Prowler scan options. With this selected Prowler will run all security checks that result in critical or high severity (250+ checks).
-
-### Full scan
-To see a list of checks, review [full checks](./checks/full_checks.txt).
-
-This option doesn't add any additional parameters to the Prowler scan. It will result in Prowler running 600+ checks.
-
-You can also use the full scan to customize the scan however you would like.
-
-For **ProwlerScanType** choose **Full**.
-
-For **ProwlerOptions**, append the check. For example, to check only if GuardDuty is enabled, enter:
-
-`aws --ignore-exit-code-3 -c guardduty_is_enabled`
-
-## Notifications
-
-You can optionally specify an email address in the EmailAddress parameter when you deploy the CloudFormation template. This will create an SNS topic and send an email when the CodeBuild job completes.
-
-This may be helpful when running longer scans, or across many accounts.
-
-For example, a single account scan with email notifications would use this command:
-
-```bash
-aws cloudformation deploy --template-file 2-sat2-codebuild-prowler.yaml \
---stack-name sat2-prowler \
---capabilities CAPABILITY_NAMED_IAM \
---parameter-overrides EmailAddress=email@domain.com
-```
-
-With or without the optional EmailAddress parameter set, you can view the progress in the CodeBuild console.
-1. Navigate to the [CodeBuild console](https://console.aws.amazon.com/codesuite/).
-
-2. In the navigation pane, under **Build**, choose **Build projects**.
-
-3. Choose the Build project that begins with **ProwlerCodeBuild-**.
-
-4. Under Build history, you will see the last run.
-
-    ![CodeBuild project](/img/codebuild-project.png)
-
-5. Optionally, you can choose **Start build** to run another scan with the options you choose when you deployed the solution.
-
-## Reporting
-
-Reporting is enabled by default. See [Security Insights Dashboard](#security-insights-dashboard-recommended) for details on dashboard contents.
-
-When reporting is enabled, the solution creates a separate CodeBuild project that:
-1. Triggers automatically when the Prowler scan completes successfully
-2. Reads the Prowler CSV output files from S3
-3. Generates an interactive HTML dashboard (`cspm_scan_insights.html`)
-4. Uploads the dashboard to the `reports/` folder in the same S3 bucket
-
-If you specify an email address while reporting is enabled, you will get an email when the scan is finished.
-
-For example, a multi-account scan with reporting and email alerts enabled would use this command:
-
-```bash
-aws cloudformation deploy --template-file 2-sat2-codebuild-prowler.yaml \
---stack-name sat2-prowler \
---capabilities CAPABILITY_NAMED_IAM \
---parameter-overrides MultiAccountScan=true Reporting=true EmailAddress=email@domain.com
-```
-
-To disable reporting, set the `Reporting` parameter to `false` when deploying the CloudFormation template.
-
 ## Frequently Asked Questions (FAQ)
 
 1.	Is there a cost?
-    + This solution is designed to run within [AWS Free Tier](https://aws.amazon.com/free/?all-free-tier.sort-by=item.additionalFields.SortRank&all-free-tier.sort-order=asc&awsf.Free%20Tier%20Types=*all&awsf.Free%20Tier%20Categories=*all).
-    + For [Amazon CodeBuild](https://aws.amazon.com/free/devops/?p=ft&z=subnav&loc=3), customer's get 100 build minutes per month.
-    + For customers that have already exceeded free tier with CodeBuild, S3, and Lambda, this solution costs less than $1 to run.
-2.	Is this a continuous monitoring and reporting tool?
-     + No. This is a one-time assessment, we recommend customers use [AWS Security Hub](https://aws.amazon.com/security-hub/) for continuous assessments.
-3.	Does this integrate with GuardDuty, Security Hub, CloudWatch, etc.?
-    + No. You can follow the instructions in [this blog](https://aws.amazon.com/blogs/security/use-aws-fargate-prowler-send-security-configuration-findings-about-aws-services-security-hub/) to integrate Prowler and Security Hub.
-4.	How do I remediate the issues in the reports?
+    + This solution is inexpensive to run. The primary cost driver is [AWS CodeBuild](https://aws.amazon.com/codebuild/pricing/) on-demand compute time. Additional minor costs come from S3 storage, Lambda invocations, and SNS notifications.
+
+    **CodeBuild compute costs by deployment type (us-east-1, Linux, On-Demand pricing):**
+
+    | Deployment Type | Instance Type | Compute Rate | Typical Duration | Estimated Cost |
+    | --------------- | ------------- | ------------ | ---------------- | -------------- |
+    | Single account (default) | general1.medium (4 vCPU, 7 GB) | $0.01/min | 15–45 min | $0.15–$0.45 |
+    | Multi-account — Small (3 concurrent) | general1.medium (4 vCPU, 7 GB) | $0.01/min | 30–120 min | $0.30–$1.20 |
+    | Multi-account — Medium (6 concurrent) | general1.large (8 vCPU, 15 GB) | $0.02/min | 30–120 min | $0.60–$2.40 |
+    | Multi-account — Large (12 concurrent) | general1.xlarge (36 vCPU, 72 GB) | $0.08/min | 30–90 min | $2.40–$7.20 |
+    | Multi-account — XLarge (48 concurrent) | general1.2xlarge (72 vCPU, 144 GB) | $0.20/min | 30–90 min | $6.00–$18.00 |
+
+    **Other service costs:**
+
+    | Service | Usage | Unit Price | Estimated Cost |
+    | ------- | ----- | ---------- | -------------- |
+    | Amazon S3 | Storage of scan reports (HTML, CSV, JSON) | $0.023/GB-month (Standard) | < $0.01 per scan |
+    | AWS Lambda | Single invocation to trigger CodeBuild | $0.20 per 1M requests + $0.0000166667/GB-sec | < $0.01 |
+    | Amazon SNS | Email notification (if configured) | $2.00 per 100K emails | Free (first 1,000 emails/month) |
+    | AWS CloudFormation | Stack deployment | — | No charge |
+
+    + **Total estimated cost:** Less than $1 for a single-account scan; $1–$18 for multi-account scans depending on the number of accounts and concurrency setting.
+    + Scan duration depends on the number of resources, scan type (Basic/Intermediate/Full), and the number of accounts. The estimates above assume typical environments.
+    + CodeBuild includes 100 free build minutes per month on `general1.small` or `arm1.small` instance types. The instance types used by this solution (general1.medium and above) are not eligible for the free tier.
+    + AWS Lambda includes 1M free requests and 400,000 GB-seconds of compute per month. Amazon SNS includes 1,000 free email notifications per month. These free tier allowances mean that Lambda and SNS costs are effectively $0 for this solution.
+    + For the latest pricing, see the [AWS CodeBuild pricing page](https://aws.amazon.com/codebuild/pricing/). Prices shown are sourced from the AWS Price List API (effective May 2025) and are subject to change.
+
+2.	What permissions does the Prowler role require?
+    + The `ProwlerMemberRole` (deployed via `1-sat2-member-roles.yaml`) is **read-only**. It uses:
+      - AWS managed policy: `SecurityAudit`
+      - AWS managed policy: `ViewOnlyAccess`
+      - An inline policy (`ProwlerAdditions`) that grants additional read-only permissions required by Prowler checks (e.g., `ec2:GetEbsEncryptionByDefault`, `s3:GetAccountPublicAccessBlock`, `backup:List*`)
+    + The role can **only** be assumed by the `ProwlerCodeBuildRole` in the account where you deploy the solution — it uses a `Condition` on `aws:PrincipalArn` to restrict trust.
+    + No write permissions are granted to any resources in your scanned accounts. The full list of additional permissions is documented in the [Prowler requirements](https://docs.prowler.cloud/en/latest/getting-started/requirements/).
+
+3.	What version of Prowler is used and how do I update it?
+    + The solution installs a pinned version of Prowler (currently **5.26.1**) in the CodeBuild environment. To update:
+      1. Update the stack with a new version: modify the `uv pip install --system prowler==5.26.1` line in the BuildSpec within `2-sat2-codebuild-prowler.yaml` to the desired version.
+      2. Re-deploy the CloudFormation stack.
+      3. The next scan will use the updated version.
+    + You can check for the latest Prowler version on the [Prowler releases page](https://github.com/prowler-cloud/prowler/releases).
+    + When updating Prowler, also review whether the check lists in `checks/` need to be refreshed, as new checks may be added or existing ones renamed.
+
+4.	Can I re-run or schedule recurring scans?
+    + **Re-run manually:** Navigate to the [CodeBuild console](https://console.aws.amazon.com/codesuite/codebuild/projects), select the **ProwlerCodeBuild** project, and choose **Start build**. This runs the scan with the same parameters you chose during deployment.
+    + **Schedule recurring scans:** This solution is designed for one-time assessments. To schedule recurring scans, you can add an Amazon EventBridge rule that triggers the CodeBuild project on a cron schedule. For continuous security monitoring, AWS recommends [AWS Security Hub](https://aws.amazon.com/security-hub/) instead.
+    + **Change scan parameters:** To change parameters (e.g., switch from Intermediate to Full scan), update the CloudFormation stack with new parameter values and re-run the build.
+
+5.	What do I do if the CodeBuild job fails or times out?
+    + **Check the build logs:** Navigate to the [CodeBuild console](https://console.aws.amazon.com/codesuite/codebuild/projects), select the **ProwlerCodeBuild** project, and review the build logs under **Build history**. Logs are also available in CloudWatch Logs under `/aws/codebuild/ProwlerCodeBuild`.
+    + **Common failure causes:**
+      - **Timeout:** The scan exceeded the `CodeBuildTimeout` value (default: 300 min). Increase the timeout or reduce the scan scope (use Intermediate instead of Full, or reduce the number of accounts).
+      - **AssumeRole failure:** The `ProwlerMemberRole` doesn't exist in the target account or has incorrect trust policy. Verify the StackSet deployed successfully to all target accounts.
+      - **Organizations access denied:** The Prowler account cannot call `ListAccounts`. Ensure you have set up either delegated administrator access or a resource policy as described in [Multi-account scan](#multi-account-scan).
+      - **Prowler check errors:** Some checks may fail due to service availability in certain regions. These are logged as warnings and don't stop the overall scan.
+    + **Re-run after fixing:** Once you resolve the issue, choose **Start build** in the CodeBuild console to re-run the scan.
+
+6.	Is this a continuous monitoring and reporting tool?
+     + No. This is a one-time assessment. We recommend customers use [AWS Security Hub](https://aws.amazon.com/security-hub/) for continuous assessments.
+7.	Does this integrate with GuardDuty, Security Hub, CloudWatch, etc.?
+    + No. If you want to send Prowler findings to Security Hub, you can use Prowler's native integration. See the [Prowler Documentation](https://docs.prowler.com/user-guide/providers/aws/securityhub) for instructions.
+8.	How do I remediate the issues in the reports?
     + Generally, the issues should be described in the report with readily identifiable corrections. Please follow up with the public documentation for each tool (Prowler) as well. If this is insufficient, please reach out to your AWS Account team or [AWS Support](https://aws.amazon.com/contact-us/) to help you understand the reports and work towards remediating issues.
 
 ## Clean Up
@@ -547,7 +604,7 @@ If you deployed the member role StackSet to scan multiple accounts, follow these
 
 3. Choose the **sat2-member-roles** StackSet.
 
-4. Choose **Actions**, then **Delete stacks form StackSet**.
+4. Choose **Actions**, then **Delete stacks from StackSet**.
 
 5. Specify the same **AWS OU ID** when you created the StackSet.
 
@@ -555,7 +612,7 @@ If you deployed the member role StackSet to scan multiple accounts, follow these
 
 7. Choose **Next**, and **Submit**.
 
-After change finishes, you can delete the StackSet.
+After the change finishes, you can delete the StackSet.
 
 1. Choose the **sat2-member-roles** StackSet.
 
