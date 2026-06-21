@@ -504,7 +504,7 @@ Resources:
                 python: 3.11
               commands:
                 - echo "Installing Prowler and dependencies..."
-                - pip3 install prowler==5.11 --quiet
+                - pip3 install prowler --quiet
                 - prowler -v
             build:
               commands:
@@ -800,6 +800,12 @@ Resources:
             - Name: notes
               Type: string
             - Name: prowler_version
+              Type: string
+            - Name: additional_urls
+              Type: string
+            - Name: account_ou_uid
+              Type: string
+            - Name: account_ou_name
               Type: string
           Location: !Sub s3://${ProwlerFindingsBucket}/csv
           InputFormat: org.apache.hadoop.mapred.TextInputFormat

@@ -9,10 +9,31 @@ logging.basicConfig()
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-path = os.environ['ATHENA_SUMMARY_CSV']
-head, tail = os.path.split(path)
+REQUIRED_COLUMNS = {'account_uid', 'check_id', 'severity', 'status'}
 
-df = pd.read_csv(tail)
+
+def load_summary_dataframe(csv_path: str) -> pd.DataFrame:
+    with open(csv_path, encoding='utf-8') as csv_file:
+        header_line = csv_file.readline()
+
+    delimiter = ';' if header_line.count(';') > header_line.count(',') else ','
+    dataframe = pd.read_csv(csv_path, sep=delimiter)
+    dataframe.columns = [column.strip().lower() for column in dataframe.columns]
+
+    missing_columns = REQUIRED_COLUMNS - set(dataframe.columns)
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {sorted(missing_columns)}")
+
+    dataframe['severity'] = dataframe['severity'].fillna('').astype(str).str.lower()
+    dataframe['status'] = dataframe['status'].fillna('').astype(str).str.upper()
+
+    return dataframe
+
+
+path = os.environ['ATHENA_SUMMARY_CSV']
+_, tail = os.path.split(path)
+
+df = load_summary_dataframe(tail)
 prs = Presentation('SHIP_HealthCheck_v3.0_Template.pptx')
 
 slides = [slide for slide in prs.slides]

@@ -1185,13 +1185,15 @@
                 showLoading('Processing CSV data...');
 
                 try {
-                    const lines = csvText.split('\n');
-                    const headers = parseCSVLine(lines[0]);
+                    const normalizedCsvText = csvText.replace(/\r\n/g, '\n').trim();
+                    const lines = normalizedCsvText.split('\n');
+                    const delimiter = detectCSVDelimiter(lines[0]);
+                    const headers = parseCSVLine(lines[0], delimiter).map(header => header.trim().toLowerCase());
 
                     allData = [];
                     for (let i = 1; i < lines.length; i++) {
                         if (lines[i].trim()) {
-                            const values = parseCSVLine(lines[i]);
+                            const values = parseCSVLine(lines[i], delimiter);
                             if (values.length === headers.length) {
                                 const row = {};
                                 headers.forEach((header, index) => {
@@ -1215,8 +1217,15 @@
                 }
             }
 
+            function detectCSVDelimiter(headerLine) {
+                const commaCount = (headerLine.match(/,/g) || []).length;
+                const semicolonCount = (headerLine.match(/;/g) || []).length;
+
+                return semicolonCount > commaCount ? ';' : ',';
+            }
+
             // Parse CSV line handling quoted values
-            function parseCSVLine(line) {
+            function parseCSVLine(line, delimiter) {
                 const result = [];
                 let current = '';
                 let inQuotes = false;
@@ -1226,7 +1235,7 @@
 
                     if (char === '"') {
                         inQuotes = !inQuotes;
-                    } else if (char === ',' && !inQuotes) {
+                    } else if (char === delimiter && !inQuotes) {
                         result.push(current);
                         current = '';
                     } else {
